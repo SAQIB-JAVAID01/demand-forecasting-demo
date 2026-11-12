@@ -30,6 +30,8 @@ with an honest backtest against simple methods.
 
 ![Live replay](reports/screens/2_live_replay.png)
 
+Screen recording, 22 seconds in dark mode at 1x then 2x: [reports/demo/live_replay_demo.mp4](reports/demo/live_replay_demo.mp4)
+
 The Live replay page plays one year of the retailer's real sales back as a simulated live feed. It is recorded
 history, clearly labelled as such, not a live connection; every number is computed from the backtest output.
 
