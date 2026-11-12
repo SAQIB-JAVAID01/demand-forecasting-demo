@@ -7,6 +7,7 @@ numbers match the desktop app. Nothing is trained here and no number is typed in
 """
 from __future__ import annotations
 
+import hmac
 import json
 import sys
 from pathlib import Path
@@ -28,6 +29,46 @@ INDICATORS = [("confidence", "Consumer confidence (index pts)", -6.0, 6.0, 0.5),
               ("inflation", "Inflation, CPI yearly (pts)", -2.0, 4.0, 0.1)]
 
 st.set_page_config(page_title="Demand Forecasting Studio", page_icon="📈", layout="wide")
+
+
+# ---------------------------------------------------------------- access
+# Demo credentials live only in Streamlit secrets (App settings > Secrets on Streamlit Community Cloud, or a local
+# .streamlit/secrets.toml that is never committed). Without them every sign-in is refused.
+def _secret(name: str) -> str:
+    try:
+        return str(st.secrets.get(name, "") or "")
+    except Exception:  # no secrets configured at all
+        return ""
+
+
+def check_login(user: str, password: str) -> bool:
+    """True only when both demo secrets are set and both match (constant-time comparison)."""
+    want_user, want_pass = _secret("demo_user"), _secret("demo_password")
+    if not want_user or not want_pass:
+        return False
+    ok_user = hmac.compare_digest(user.encode("utf-8"), want_user.encode("utf-8"))
+    ok_pass = hmac.compare_digest(password.encode("utf-8"), want_pass.encode("utf-8"))
+    return ok_user and ok_pass
+
+
+def login_gate() -> None:
+    if st.session_state.get("signed_in"):
+        return
+    st.title("Demand Forecasting Studio")
+    st.caption("Demo access only. Sign in with the demo username and password you were given.")
+    with st.form("login"):
+        user = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        submitted = st.form_submit_button("Sign in")
+    if submitted:
+        if check_login(user, password):
+            st.session_state["signed_in"] = True
+            st.rerun()
+        st.error("Sign-in failed. Check the username and password.")
+    st.stop()
+
+
+login_gate()
 
 
 # ---------------------------------------------------------------- data
