@@ -15,7 +15,7 @@ from brand import logo_pixmap
 W, H = 1600, 1200
 CAPTIONS = [
     ("Executive summary", "The answer in one screen: accuracy, level and risk, in plain words"),
-    ("Live replay", "A year of demand arriving week by week, with each forecast drawn before its week"),
+    ("Live replay", "Real-time replay of real sales: live forecast, KPIs, anomaly feed and sales race"),
     ("Forecast accuracy", "Where the forecast is strong and where it is weak"),
     ("Products", "Every product: forecast against actual sales"),
     ("Product explorer", "History, forecast and 80% range for any product, with CSV export"),
@@ -59,7 +59,7 @@ def frame(shot: QPixmap, title: str, caption: str) -> QPixmap:
     p.setPen(QColor("#9fb4d0"))
     p.setFont(QFont("Segoe UI", 12))
     p.drawText(QRectF(margin, H - 66, W - 2 * margin, 40), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-               "Real screenshot. Public data (UCI Online Retail II). Python · pandas · LightGBM · PyQt6. "
+               "Real screenshot. Public data (UCI Online Retail II). Python · pandas · LightGBM · PyQt6 · pyqtgraph. "
                "Results from a final test period never used to tune the model.")
     p.end()
     return pm
@@ -91,8 +91,7 @@ def export(window, app, out: Path) -> None:
     for i, (title, caption) in enumerate(CAPTIONS):
         window.go(i)
         if title == "Live replay":
-            window.timer.stop()
-            window.l_slider.setValue(40)
+            window.live.snapshot(40.55)
         app.processEvents()
         app.processEvents()
         frame(full_page(window), title, caption).save(str(out / f"{i + 1}_{title.lower().replace(' ', '_')}.png"))

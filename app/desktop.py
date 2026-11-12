@@ -12,10 +12,10 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
-                             QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QPushButton, QScrollArea, QSlider,
+                             QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QPushButton, QScrollArea,
                              QSizePolicy, QStackedWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +25,7 @@ from src.report import FEATURE_NAMES  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from brand import logo_icon, logo_pixmap, save_assets  # noqa: E402
 from charts import Chart  # noqa: E402
+from live import LivePage  # noqa: E402
 
 BASE = "ma13"                       # strongest simple method on the final test (the tougher comparison)
 BASE_LABEL = "13-week average"
@@ -77,6 +78,10 @@ def qss(t: dict) -> str:
     QLabel#hero1 {{ font-size: 14pt; font-weight: 600; }}
     QLabel#hero2 {{ color: {t['ink2']}; font-size: 10.5pt; }}
     QLabel#kv {{ font-size: 23pt; font-weight: 700; }}
+    QWidget#kv {{ font-size: 23pt; font-weight: 700; }}
+    QWidget#badge {{ font-size: 9pt; font-weight: 700; }}
+    QWidget#kn {{ font-size: 9.5pt; }}
+    QWidget#kl {{ font-weight: 600; }}
     QLabel#kl {{ color: {t['ink']}; font-weight: 600; }}
     QLabel#kn {{ color: {t['ink2']}; font-size: 9.5pt; }}
     QLabel#eyebrow {{ color: {t['s1']}; font-size: 8.5pt; font-weight: 700; }}
@@ -97,6 +102,11 @@ def qss(t: dict) -> str:
     QTableWidget::item:selected {{ background: {t['sel']}; color: {t['ink']}; }}
     QHeaderView::section {{ background: {t['surface']}; color: {t['ink2']}; border: none;
                             border-bottom: 1px solid {t['grid']}; padding: 7px; font-weight: 600; }}
+    QComboBox {{ background: {t['surface']}; color: {t['ink']}; border: 1px solid {t['border']}; border-radius: 8px;
+                 padding: 5px 10px; }}
+    QComboBox QAbstractItemView {{ background: {t['surface']}; color: {t['ink']}; selection-background-color: {t['sel']};
+                                   selection-color: {t['ink']}; }}
+    QFrame#hero QComboBox, QFrame#hero QLineEdit {{ background: {t['surface']}; }}
     QScrollBar:vertical {{ background: transparent; width: 10px; }}
     QScrollBar::handle:vertical {{ background: {t['axis']}; border-radius: 5px; min-height: 30px; }}
     QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
@@ -161,7 +171,7 @@ class NumItem(QTableWidgetItem):
 
 
 PAGES = [("Executive summary", "The answer in one screen"),
-         ("Live replay", "Watch a year of demand arrive week by week, with each forecast drawn before its week"),
+         ("Live replay", "Real-time replay of a year of real sales, with each forecast drawn before its week"),
          ("Forecast accuracy", "Where the forecast is strong and where it is weak"),
          ("Products", "How every product performed in the final test"),
          ("Product explorer", "History, forecast and range for one product"),
@@ -196,10 +206,6 @@ class Window(QMainWindow):
         self.final_end = self.preds["week"].max()
         self.sku = None
         self._ci_cache = {}
-        self.rp_k = 0
-        self.timer = QTimer(self)
-        self.timer.setInterval(800)
-        self.timer.timeout.connect(self.tick)
         self._build()
         self.apply_theme()
 
@@ -277,7 +283,7 @@ class Window(QMainWindow):
         self.b_theme.clicked.connect(self.toggle_theme)
         n.addWidget(self.b_theme)
         n.addSpacing(6)
-        n.addWidget(label("Public data: UCI Online Retail II\nPython · pandas · LightGBM · PyQt6", "navfoot"))
+        n.addWidget(label("Public data: UCI Online Retail II\nPython · pandas · LightGBM · PyQt6\npyqtgraph · statsmodels\nscipy · scikit-learn", "navfoot"))
         outer.addWidget(nav)
 
         right = QWidget()
@@ -351,74 +357,10 @@ class Window(QMainWindow):
         self.s_take, self.s_hist = Card("What this means for the business", text=True), Card("Two years of demand", 240)
         self._row(lay, self.s_take, self.s_hist, stretch=(2, 3), weight=1)
 
-        # ----- live replay -----
+        # ----- live replay (real-time charts) -----
         lay = self._page()
-        ctl = QFrame()
-        ctl.setObjectName("hero")
-        cl = QHBoxLayout(ctl)
-        cl.setContentsMargins(20, 14, 20, 14)
-        cl.setSpacing(8)
-        txt = QVBoxLayout()
-        txt.setSpacing(2)
-        self.l_week, self.l_status = label("", "hero1"), label("", "hero2", True)
-        txt.addWidget(self.l_week)
-        txt.addWidget(self.l_status)
-        cl.addLayout(txt, 1)
-        self.b_play = QPushButton("Play")
-        self.b_play.setObjectName("primary")
-        self.b_play.setMinimumWidth(84)
-        self.b_play.clicked.connect(self.toggle_play)
-        b_restart = QPushButton("Restart")
-        b_restart.clicked.connect(self.restart_replay)
-        cl.addWidget(self.b_play)
-        cl.addWidget(b_restart)
-        cl.addSpacing(10)
-        cl.addWidget(label("SPEED", "flabel"))
-        self.b_speed, grp = [], QButtonGroup(self)
-        for v in (1, 2, 4):
-            b = QPushButton(f"{v}x")
-            b.setCheckable(True)
-            b.setChecked(v == 1)
-            b.setProperty("value", v)
-            b.clicked.connect(self.set_speed)
-            grp.addButton(b)
-            cl.addWidget(b)
-            self.b_speed.append(b)
-        cl.addSpacing(10)
-        cl.addWidget(label("VIEW", "flabel"))
-        self.b_scope, grp2 = [], QButtonGroup(self)
-        for i, text in enumerate(("All products", "Selected product")):
-            b = QPushButton(text)
-            b.setCheckable(True)
-            b.setChecked(i == 0)
-            b.clicked.connect(self.replay_draw)
-            grp2.addButton(b)
-            cl.addWidget(b)
-            self.b_scope.append(b)
-        lay.addWidget(ctl)
-        self.l_slider = QSlider(Qt.Orientation.Horizontal)
-        self.l_slider.valueChanged.connect(self.seek)
-        lay.addWidget(self.l_slider)
-        self.lk = []
-        lrow = QHBoxLayout()
-        lrow.setSpacing(14)
-        for title in ("This week", "Error so far", "Forecast level so far", "Inside the 80% range so far"):
-            f = QFrame()
-            f.setObjectName("card")
-            l = QVBoxLayout(f)
-            l.setContentsMargins(18, 12, 18, 12)
-            l.setSpacing(2)
-            val, note = label("", "kv"), label("", "kn", True)
-            l.addWidget(label(title, "kl"))
-            l.addWidget(val)
-            l.addWidget(note)
-            lrow.addWidget(f)
-            self.lk.append((val, note))
-        lay.addLayout(lrow)
-        self.l_main, self.l_race = Card("Demand as it arrives", 310), Card("Top sellers so far", 310)
-        self._row(lay, self.l_main, self.l_race, stretch=(3, 2), weight=1)
-        self.l_err, self.l_txt = Card("Running accuracy", 230), Card("What you are watching", text=True)
-        self._row(lay, self.l_err, self.l_txt, stretch=(3, 2), weight=1)
+        self.live = LivePage(self, C.PROCESSED_DIR / "transactions.parquet", BASE, BASE_LABEL, THEMES)
+        lay.addWidget(self.live, 1)
 
         # ----- accuracy -----
         lay = self._page()
@@ -493,13 +435,7 @@ class Window(QMainWindow):
     # ================= state =================
     def go(self, i: int):
         self.stack.setCurrentIndex(i)
-        live = PAGES[i][0] == "Live replay"
-        if live and not self.timer.isActive() and self.rp_k < len(getattr(self, "rp_weeks", [])) - 1:
-            self.timer.start()
-            self.b_play.setText("Pause")
-        elif not live and self.timer.isActive():
-            self.timer.stop()
-            self.b_play.setText("Play")
+        self.live.activate(PAGES[i][0] == "Live replay")
         self.nav_group.button(i).setChecked(True)
         self.title.setText(PAGES[i][0])
         self.subtitle.setText(PAGES[i][1])
@@ -706,7 +642,7 @@ class Window(QMainWindow):
                                 [self.bias(fin, k_) for k_ in keys], ["s1" if k_ == mdl else "neutral" for k_ in keys],
                                 fmt=lambda v: spct(v, 1), signed=True)
         self.fill_products()
-        self.replay_prepare()
+        self.live.prepare()
 
     def _fill_ptable(self, ps: pd.DataFrame, t: dict):
         cols = ["Product", "Class", "Sold", "Forecast", "Level", "Model err.", "Simple err.", "Change"]
@@ -765,7 +701,7 @@ class Window(QMainWindow):
         if item:
             self.sku = item.data(Qt.ItemDataRole.UserRole)
             self.show_product()
-            self.replay_draw()
+            self.live.follow(self.sku)
 
     def product_table(self) -> pd.DataFrame:
         p = self.preds[self.preds["sku"] == self.sku].sort_values("week")
@@ -845,14 +781,6 @@ class Window(QMainWindow):
                        "This is why simple averages are hard to beat on this data.")
         self.d_imp.chart.hbars(t, [FEATURE_NAMES.get(k, k) for k in imp.index], list(imp.values), ["s1"] * len(imp),
                                fmt=lambda x: pct(x, 0))
-        self.l_txt.say("A replay of one year, the way a planner would have lived it")
-        self.l_txt.body.setText(
-            "<b>What moves.</b> Each tick is one week. Sales appear as they happened. The forecast line always runs ahead "
-            "of today, because it was made before those weeks.<br><br>"
-            "<b>What to look for.</b> How closely the blue line anticipates the grey one, how the error settles as more "
-            "weeks are checked, and how the best sellers change through the year.<br><br>"
-            "<b>Honest label.</b> This is recorded history from a public data set, played back. Nothing here was fitted "
-            "after the fact: every forecast uses only data from before its week.")
         self.d_txt.say("How the forecast is made and tested")
         self.d_txt.body.setText(
             f"<b>Data.</b> Every transaction of a UK online gift retailer from {d['date_min']} to {d['date_max']} "
@@ -866,154 +794,10 @@ class Window(QMainWindow):
             f"<b>Limits.</b> Two years of data, one earlier Christmas, no stock levels and no promotion calendar. "
             f"Results will differ on other data.")
 
-    # ================= live replay =================
-    def replay_prepare(self):
-        """Rows for the replay: every forecast week (selection and final), with the current filters."""
-        p = self.preds
-        self.rp_rows = p[p["abc"].isin(self._on(self.b_abc)) & p["demand_type"].isin(self._on(self.b_type))
-                         & p["h"].isin(self._on(self.b_h))]
-        self.rp_weeks = list(pd.DatetimeIndex(sorted(p["week"].unique())))
-        self.week_t = dict(zip(self.cal["week"], self.cal["t"]))
-        self.rp_k = min(self.rp_k, len(self.rp_weeks) - 1)
-        self.l_slider.blockSignals(True)
-        self.l_slider.setRange(0, len(self.rp_weeks) - 1)
-        self.l_slider.setValue(self.rp_k)
-        self.l_slider.blockSignals(False)
-        self.replay_draw()
-
-    def replay_draw(self):
-        if not hasattr(self, "rp_rows"):
-            return
-        t, k, weeks, mdl = THEMES[self.theme], self.rp_k, self.rp_weeks, self.model
-        now, t_now = weeks[k], self.week_t[weeks[k]]
-        one = self.b_scope[1].isChecked() and self.sku is not None
-        rows = self.rp_rows[self.rp_rows["sku"] == self.sku] if one else self.rp_rows
-        if rows.empty:
-            rows, one = self.rp_rows, False
-        name = str(rows["description"].iloc[0]).title() if one else f"{rows['sku'].nunique()} products"
-
-        # ---- main chart: history, actuals up to now, forecasts already issued ----
-        g = rows.groupby("week").agg(y=("y", "sum"), m=(mdl, "sum"), lo=("lo", "sum"), hi=("hi", "sum"),
-                                     cut=("cutoff_t", "max")).reindex(weeks)
-        ph = self.panel[self.panel["sku"].isin(rows["sku"].unique())]
-        ctx = ph[ph["week"] < weeks[0]].groupby("week")["units"].sum().tail(26)
-        seen = np.array([w <= now for w in weeks])
-        issued = (g["cut"] < t_now).to_numpy()
-        pad = [np.nan] * len(ctx)
-        actual = list(ctx.to_numpy(float)) + list(np.where(seen, g["y"], np.nan))
-        fc = pad + list(np.where(issued, g["m"], np.nan))
-        band = (np.array(pad + list(np.where(issued, g["lo"], np.nan)), float),
-                np.array(pad + list(np.where(issued, g["hi"], np.nan)), float)) if one else None
-        top = np.nanmax([ctx.max() if len(ctx) else 0, g["y"].max(), g["m"].max(), g["hi"].max() if one else 0]) * 1.12
-        y_now, m_now = g["y"].get(now, np.nan), g["m"].get(now, np.nan)
-        ahead = int(np.nansum(issued & ~seen))
-        if np.isnan(y_now):
-            self.l_main.say(f"{name}: no forecast for this week with the current filters.")
-        else:
-            self.l_main.say(f"{name}: {y_now:,.0f} units sold this week; the forecast said {m_now:,.0f}.",
-                            f"Grey = sales as they arrive. Blue = forecast, drawn before each week happens "
-                            f"({ahead} week{'s' if ahead != 1 else ''} ahead of today on screen)."
-                            + (" Light blue = 80% range." if one else "") + " Dashed line = today in the replay.")
-        self.l_main.chart.lines(t, list(ctx.index) + weeks, [
-            dict(name="Actual units", color="actual", values=actual),
-            dict(name="Forecast", color="s1", values=fc)], band=band, mark=now, ymax=top, area="Actual units")
-
-        # ---- live tiles ----
-        done = rows[(rows["week"] <= now) & ~rows["closed"]]
-        self.l_week.setText(f"Week of {now:%d %B %Y}")
-        self.l_status.setText(f"Week {k + 1} of {len(weeks)} in the replay. This is recorded history played back, not a live feed: "
-                              f"each forecast shown was made before its week, using only earlier data.")
-        ysum = done["y"].sum()
-        if len(done) and ysum > 0:
-            wm, wb, bs = self.wape(done, mdl), self.wape(done, BASE), self.bias(done, mdl)
-            cov = float(((done["y"] >= done["lo"]) & (done["y"] <= done["hi"])).mean())
-            self.lk[0][0].setText("closed" if np.isnan(y_now) or rows[rows["week"] == now]["closed"].all() else f"{y_now:,.0f}")
-            self.lk[0][1].setText("business shut this week" if np.isnan(y_now) or rows[rows["week"] == now]["closed"].all()
-                                  else f"units sold. Forecast {m_now:,.0f} ({spct(m_now / y_now - 1) if y_now else 'n/a'}).")
-            self.lk[1][0].setText(pct(wm))
-            self.lk[1][0].setStyleSheet(f"color: {t['good'] if wm < wb else t['bad']};")
-            self.lk[1][1].setText(f"{BASE_LABEL}: {pct(wb)}. Model is {'ahead' if wm < wb else 'behind'}.")
-            self.lk[2][0].setText(spct(bs))
-            self.lk[2][0].setStyleSheet(f"color: {t['bad'] if abs(bs) > 0.10 else t['good']};")
-            self.lk[2][1].setText(f"{done[mdl].sum():,.0f} forecast vs {ysum:,.0f} sold.")
-            self.lk[3][0].setText(pct(cov, 0))
-            self.lk[3][1].setText(f"{len(done):,} forecasts checked. Target 80%.")
-        else:
-            for val, note in self.lk:
-                val.setText("0")
-                note.setText("waiting for the first open week")
-
-        # ---- race: cumulative sales by product ----
-        pool = self.rp_rows[self.rp_rows["week"] <= now]
-        cum = pool.groupby("sku")["y"].sum().nlargest(8)
-        names = pool.drop_duplicates("sku").set_index("sku")["description"]
-        labs = [(str(names[s_]).title()[:24] + ("…" if len(str(names[s_])) > 24 else "")) for s_ in cum.index]
-        if len(cum) and cum.max() > 0:
-            self.l_race.say(f"Leader: {str(names[cum.index[0]]).title()} with {cum.iloc[0]:,.0f} units.",
-                            "Units sold since the replay started. The order changes as the weeks go by."
-                            + (" Blue = the selected product." if one else " Blue = the leader."))
-            hi_sku = self.sku if one and self.sku in cum.index else cum.index[0]
-            self.l_race.chart.hbars(t, labs, [float(v) for v in cum.values],
-                                    ["s1" if s_ == hi_sku else "neutral" for s_ in cum.index], fmt=lambda v: f"{v:,.0f}")
-
-        # ---- running accuracy ----
-        ok = rows[~rows["closed"]]
-        c = ok.assign(em=(ok[mdl] - ok["y"]).abs(), eb=(ok[BASE] - ok["y"]).abs()).groupby("week")[["y", "em", "eb"]].sum() \
-              .reindex(weeks).fillna(0).cumsum()
-        with np.errstate(divide="ignore", invalid="ignore"):
-            rm, rb = (c["em"] / c["y"]).to_numpy(), (c["eb"] / c["y"]).to_numpy()
-        full_top = float(np.nanmax(np.concatenate([rm[np.isfinite(rm)], rb[np.isfinite(rb)], [0.5]]))) * 1.15
-        rm, rb = np.where(seen & np.isfinite(rm), rm, np.nan), np.where(seen & np.isfinite(rb), rb, np.nan)
-        if np.isfinite(rm[k]) and np.isfinite(rb[k]):
-            self.l_err.say(f"So far the model's error is {pct(rm[k])}; the {BASE_LABEL} is at {pct(rb[k])}.",
-                           "Error over all weeks replayed so far. Lower is better. Early weeks swing because few forecasts have been checked.")
-        else:
-            self.l_err.say("Waiting for the first open week.", "")
-        self.l_err.chart.lines(t, weeks, [dict(name="Model", color="s1", values=rm),
-                                          dict(name=BASE_LABEL, color="s2", width=1.8, values=rb)],
-                               ymax=min(full_top, 2.0), yfmt=lambda v: f"{100 * v:.0f}%")
-
-    def toggle_play(self):
-        if self.timer.isActive():
-            self.timer.stop()
-            self.b_play.setText("Play")
-        else:
-            if self.rp_k >= len(self.rp_weeks) - 1:
-                self.rp_k = 0
-            self.timer.start()
-            self.b_play.setText("Pause")
-
-    def tick(self):
-        if self.rp_k >= len(self.rp_weeks) - 1:
-            self.timer.stop()
-            self.b_play.setText("Replay")
-            return
-        self.rp_k += 1
-        self.l_slider.blockSignals(True)
-        self.l_slider.setValue(self.rp_k)
-        self.l_slider.blockSignals(False)
-        self.replay_draw()
-
-    def seek(self, value: int):
-        self.rp_k = int(value)
-        self.replay_draw()
-
-    def restart_replay(self):
-        self.rp_k = 0
-        self.l_slider.blockSignals(True)
-        self.l_slider.setValue(0)
-        self.l_slider.blockSignals(False)
-        self.replay_draw()
-        if not self.timer.isActive():
-            self.toggle_play()
-
-    def set_speed(self):
-        v = next(b.property("value") for b in self.b_speed if b.isChecked())
-        self.timer.setInterval(int(800 / v))
-
     # ================= theme =================
     def apply_theme(self):
         self.setStyleSheet(qss(THEMES[self.theme]))
+        self.live.apply_theme(THEMES[self.theme])
         self.b_theme.setText("Light mode" if self.theme == "dark" else "Dark mode")
         self.render_static()
         self.refresh()
@@ -1022,6 +806,33 @@ class Window(QMainWindow):
     def toggle_theme(self):
         self.theme = "dark" if self.theme == "light" else "light"
         self.apply_theme()
+
+
+def live_shots(w, app, out: Path):
+    """Frames of the real-time page: all products (light), one product and a class (dark)."""
+    from catalog import full_page
+    out.mkdir(parents=True, exist_ok=True)
+    w.show()
+    live = PAGES.index(next(p for p in PAGES if p[0] == "Live replay"))
+    if w.theme != "light":
+        w.toggle_theme()
+    w.go(live)
+    top = w.preds.groupby("sku")["y"].sum().idxmax()          # best seller, for the one-product frame
+    w.live.cb_prod.setCurrentIndex(max(w.live.cb_prod.findData(top), 0))
+    for pos, scope, theme, name in ((30.45, 0, "light", "2_live_replay.png"),
+                                    (47.6, 6, "dark", "2b_live_replay_product_dark.png"),
+                                    (50.62, 1, "dark", "2c_live_replay_class_a_dark.png")):
+        if w.theme != theme:
+            w.toggle_theme()
+            w.go(live)
+        w.live.cb_scope.setCurrentIndex(scope)
+        w.live.snapshot(pos)
+        for _ in range(3):
+            app.processEvents()
+        full_page(w).save(str(out / name))
+    w.live.cb_scope.setCurrentIndex(0)
+    if w.theme != "light":
+        w.toggle_theme()
 
 
 def main():
@@ -1037,8 +848,7 @@ def main():
         for i, (name, _) in enumerate(PAGES):
             w.go(i)
             if name == "Live replay":
-                w.timer.stop()
-                w.l_slider.setValue(40)
+                w.live.snapshot(40.55)
             app.processEvents()
             full_page(w).save(str(out / f"{i + 1}_{name.lower().replace(' ', '_')}.png"))
         w.b_model[1].click()
@@ -1050,6 +860,10 @@ def main():
         w.go(0)
         app.processEvents()
         full_page(w).save(str(out / "8_executive_summary_dark.png"))
+        live_shots(w, app, out)
+        return
+    if "--live-shots" in sys.argv:           # only the real-time page, light and dark
+        live_shots(w, app, Path(sys.argv[sys.argv.index("--live-shots") + 1]))
         return
     if "--catalog" in sys.argv:              # 4:3 images for a portfolio or project catalog
         from catalog import export

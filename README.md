@@ -16,9 +16,47 @@ with an honest backtest against simple methods.
 | `src/backtest.py` | Rolling-origin backtest: 5 simple methods and LightGBM, 13 forecast dates |
 | `src/evaluate.py` | WAPE, bias, bootstrap confidence intervals, segment breakdowns, interval calibration |
 | `src/report.py` | Charts and `reports/REPORT.md`, generated from the results |
-| `app/desktop.py` | Demand Forecasting Studio, a PyQt6 desktop app: 6 pages (executive summary, accuracy, products, product explorer, risk and stock, data and method), 13 charts with a plain-language finding above each, a switch between the two forecast settings, filters, CSV export, dark mode. Screenshots in `reports/screens/` |
+| `app/desktop.py` | Demand Forecasting Studio, a PyQt6 desktop app: 7 pages (executive summary, live replay, accuracy, products, product explorer, risk and stock, data and method), charts with a plain-language finding above each, a switch between the two forecast settings, filters, CSV export, dark mode. Screenshots in `reports/screens/` |
+| `app/live.py` | The real-time Live replay page: animated pyqtgraph charts driven by a 30 fps timer (see below) |
 | `app/dashboard.html` | The same view as a single HTML file (built by `src/build_dashboard.py`), no server needed |
 | `tests/` | Tests that change the future and check the model inputs do not move |
+
+## Live replay: real-time charts
+
+![Live replay](reports/screens/2_live_replay.png)
+
+The Live replay page plays one year of the retailer's real sales back as a simulated live feed. It is recorded
+history, clearly labelled as such, not a live connection; every number is computed from the backtest output.
+
+- **Demand as it arrives.** Sales fill in day by day from the cleaned transactions, so the current week grows as
+  orders come in. A forecast appears only after the date it was made, so the forecast line and its 80% range always
+  run ahead of "today". A LOWESS trend line (statsmodels) follows the sales seen so far.
+- **Live KPIs that tick.** Units this week against the forecast, running error (WAPE) against the 13-week average,
+  forecast level (bias) and the share of weeks inside the 80% range, each with a sparkline. The running scores use
+  scikit-learn metrics (mean absolute error, pinball / quantile loss).
+- **Anomaly and stock-risk feed.** Product-weeks whose sales broke out of the 80% range by at least 2 robust
+  standard deviations of that product's earlier misses (median absolute deviation, scipy), newest first, marked as
+  stock-out or overstock risk.
+- **Running accuracy, sales race and forecast-vs-actual scatter**, all animated as weeks are checked.
+- **Controls.** Play / pause, restart, speed 1x to 8x, a timeline slider, and a scope picker: all products, a
+  revenue class, regular or intermittent sellers, or one searchable product. The top-bar filters and the forecast
+  setting apply too. Light and dark mode.
+- **Performance.** pyqtgraph redraws only what changed; the ticking numbers are painted directly so they never
+  force a relayout, which keeps the page at about 30 frames a second without blocking the window.
+
+| | |
+|---|---|
+| ![One product, dark](reports/screens/2b_live_replay_product_dark.png) | ![Class A, dark](reports/screens/2c_live_replay_class_a_dark.png) |
+
+## Tech stack
+
+| Area | Libraries |
+|---|---|
+| Data preparation | pandas, NumPy, PyArrow (Parquet), openpyxl |
+| Forecasting | LightGBM (gradient boosting), five baseline methods |
+| Statistics | statsmodels (LOWESS trend), SciPy (robust anomaly scores), scikit-learn (error and quantile-loss metrics) |
+| Desktop app | PyQt6, pyqtgraph (real-time charts), Matplotlib (static charts) |
+| Testing | pytest (leakage tests) |
 
 ## How the test is kept honest
 
@@ -35,6 +73,7 @@ pip install -r requirements.txt
 python run_all.py            # download, clean, backtest, score, report (about 10 minutes)
 python -m pytest tests -q
 python app/desktop.py
+python app/desktop.py --screenshot reports/screens   # regenerate the screenshots
 ```
 
 ## Data
