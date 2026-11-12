@@ -16,7 +16,8 @@ with an honest backtest against simple methods.
 | `src/backtest.py` | Rolling-origin backtest: 5 simple methods and LightGBM, 13 forecast dates |
 | `src/evaluate.py` | WAPE, bias, bootstrap confidence intervals, segment breakdowns, interval calibration |
 | `src/report.py` | Charts and `reports/REPORT.md`, generated from the results |
-| `app/dashboard.py` | Streamlit dashboard for planners |
+| `app/desktop.py` | PyQt6 desktop app for planners: filters, hover charts, product explorer, CSV export, dark mode |
+| `app/dashboard.html` | The same view as a single HTML file (built by `src/build_dashboard.py`), no server needed |
 | `tests/` | Tests that change the future and check the model inputs do not move |
 
 ## How the test is kept honest
@@ -33,7 +34,7 @@ with an honest backtest against simple methods.
 pip install -r requirements.txt
 python run_all.py            # download, clean, backtest, score, report (about 10 minutes)
 python -m pytest tests -q
-streamlit run app/dashboard.py
+python app/desktop.py
 ```
 
 ## Data

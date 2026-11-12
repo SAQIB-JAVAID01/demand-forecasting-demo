@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demand forecasting dashboard</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834; --actual: #52514e; --band: #cde2fb; --neutral: #c3c2b7;
+  --chip: #efeeea; --chip-on: #0b0b0b; --chip-on-ink: #ffffff; --good: #006300; --bad: #b3261e;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --s1: #3987e5; --s2: #d95926; --actual: #c3c2b7; --band: #104281; --neutral: #52514e;
+  --chip: #262624; --chip-on: #f0efec; --chip-on-ink: #0b0b0b; --good: #0ca30c; --bad: #e66767;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --actual: #c3c2b7; --band: #104281; --neutral: #52514e;
+    --chip: #262624; --chip-on: #f0efec; --chip-on-ink: #0b0b0b; --good: #0ca30c; --bad: #e66767;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 22px 48px; }
+header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.sub { color: var(--ink2); margin: 0; max-width: 760px; }
+button, input, select { font: inherit; color: inherit; }
+.ghost { background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
+.ghost:hover { background: var(--chip); }
+.filters { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; margin: 22px 0 14px; }
+.fgroup { display: flex; align-items: center; gap: 6px; }
+.flabel { color: var(--ink2); font-size: 13px; margin-right: 2px; }
+.chip { background: var(--chip); border: 0; border-radius: 999px; padding: 5px 13px; cursor: pointer; font-size: 13.5px; }
+.chip[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-ink); }
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+.kpi .v { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.kpi .l { color: var(--ink2); font-size: 13.5px; margin-top: 4px; }
+.kpi .n { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 12px; margin-top: 12px; }
+h2 { font-size: 16px; margin: 0; }
+.cap { color: var(--ink2); font-size: 13.5px; margin: 2px 0 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--ink2); margin-bottom: 4px; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.legend i.box { height: 10px; border-radius: 3px; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 11px; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,0.14);
+  min-width: 170px; display: none; z-index: 5; }
+.tip b { display: block; margin-bottom: 4px; }
+.tip .r { display: flex; justify-content: space-between; gap: 14px; color: var(--ink2); }
+.tip .r span:last-child { color: var(--ink); font-variant-numeric: tabular-nums; }
+.tip .r i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+.bars { display: grid; grid-template-columns: max-content 1fr max-content; gap: 9px 10px; align-items: center; font-size: 13.5px; }
+.bars .name { color: var(--ink2); }
+.bars .track { height: 16px; }
+.bars .fill { height: 100%; border-radius: 0 4px 4px 0; background: var(--neutral); }
+.bars .fill.on { background: var(--s1); }
+.bars .val { font-variant-numeric: tabular-nums; text-align: right; }
+.bars .on { font-weight: 700; color: var(--ink); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+select, input[type=search] { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+select { min-width: 320px; max-width: 100%; }
+.pstats { display: flex; flex-wrap: wrap; gap: 6px 22px; color: var(--ink2); font-size: 13.5px; margin: 0 0 6px; }
+.pstats b { color: var(--ink); font-variant-numeric: tabular-nums; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--grid); }
+th { color: var(--ink2); font-weight: 600; position: sticky; top: 0; background: var(--surface); }
+th:first-child, td:first-child { text-align: left; }
+.tablewrap { max-height: 300px; overflow: auto; margin-top: 10px; display: none; }
+.notes { color: var(--ink2); font-size: 13.5px; }
+.notes li { margin-bottom: 6px; }
+.notes b { color: var(--ink); }
+footer { color: var(--muted); font-size: 12.5px; margin-top: 18px; }
+.full { margin-top: 12px; }
+@media (max-width: 860px) { .kpis { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Demand forecasting: UK online retailer</h1>
+      <p class="sub" id="subtitle"></p>
+    </div>
+    <button class="ghost" id="theme" type="button">Dark mode</button>
+  </header>
+
+  <div class="filters" id="filters"></div>
+
+  <div class="kpis">
+    <div class="card kpi"><div class="v" id="k1"></div><div class="l">Model forecast error (WAPE)</div><div class="n" id="k1n"></div></div>
+    <div class="card kpi"><div class="v" id="k2"></div><div class="l" id="k2l"></div><div class="n" id="k2n"></div></div>
+    <div class="card kpi"><div class="v" id="k3"></div><div class="l">Bias (forecast vs actual units)</div><div class="n" id="k3n"></div></div>
+    <div class="card kpi"><div class="v" id="k4"></div><div class="l">Actuals inside the 80% interval</div><div class="n">target 80%</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Total weekly demand</h2>
+      <p class="cap">Final test period. Every forecast was made before the week it covers.</p>
+      <div class="legend" id="lg1"></div>
+      <div class="chart" id="c1"></div>
+    </div>
+    <div class="card">
+      <h2>Forecast error by method</h2>
+      <p class="cap">All 200 products, final test period. Lower is better. Blue = setting chosen on earlier folds.</p>
+      <div class="bars" id="bars"></div>
+    </div>
+  </div>
+
+  <div class="card full">
+    <h2>One product</h2>
+    <p class="cap">History, forecast and 80% interval. The dashed line marks the start of the final test period.</p>
+    <div class="row">
+      <input type="search" id="search" placeholder="Search product or code" aria-label="Search product">
+      <select id="sku" aria-label="Product"></select>
+      <button class="ghost" id="toggleTable" type="button">Show table</button>
+      <button class="ghost" id="csv" type="button">Download CSV</button>
+    </div>
+    <p class="pstats" id="pstats"></p>
+    <div class="legend" id="lg2"></div>
+    <div class="chart" id="c2"></div>
+    <div class="tablewrap" id="tablewrap"><table id="ptable"></table></div>
+  </div>
+
+  <div class="card full">
+    <h2>How to read this</h2>
+    <ul class="notes" id="notes"></ul>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+const D = /*__DATA__*/;
+const $ = id => document.getElementById(id);
+const pct = (x, d = 1) => (100 * x).toFixed(d) + "%";
+const spct = (x, d = 0) => (x >= 0 ? "+" : "") + (100 * x).toFixed(d) + "%";
+const num = x => x == null ? "" : Math.round(x).toLocaleString("en-US");
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const wk = i => { const [y, m, d] = D.weeks[i].split("-"); return `${+d} ${MONTHS[+m - 1]} ${y}`; };
+const mon = i => { const [y, m] = D.weeks[i].split("-"); return `${MONTHS[+m - 1]} ${y}`; };
+// forecast row layout: [t, h, final, closed, y, model, base, tweedie, lo, hi]
+const T = 0, H = 1, FIN = 2, CL = 3, Y = 4, M = 5, B = 6, TW = 7, LO = 8, HI = 9;
+const finalStart = Math.min(...D.products.flatMap(p => p.f.filter(r => r[FIN]).map(r => r[T])));
+
+const state = { abc: new Set(["A", "B", "C"]), type: new Set(["regular", "intermittent"]),
+                h: new Set([1, 2, 3, 4]), sku: null };
+
+// ---------- filters ----------
+function chips(label, key, options) {
+  const g = document.createElement("div"); g.className = "fgroup";
+  const l = document.createElement("span"); l.className = "flabel"; l.textContent = label; g.append(l);
+  for (const [val, text] of options) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = text;
+    b.setAttribute("aria-pressed", "true");
+    b.onclick = () => {
+      const s = state[key];
+      if (s.has(val)) { if (s.size > 1) s.delete(val); } else s.add(val);
+      b.setAttribute("aria-pressed", s.has(val));
+      render();
+    };
+    g.append(b);
+  }
+  $("filters").append(g);
+}
+chips("Revenue class", "abc", [["A", "A: top 20%"], ["B", "B: next 30%"], ["C", "C: rest"]]);
+chips("Demand pattern", "type", [["regular", "Regular"], ["intermittent", "Intermittent"]]);
+chips("Weeks ahead", "h", [[1, "1"], [2, "2"], [3, "3"], [4, "4"]]);
+
+const selectedProducts = () => D.products.filter(p => state.abc.has(p.a) && state.type.has(p.t));
+const scoreRows = p => p.f.filter(r => r[FIN] && !r[CL] && state.h.has(r[H]));
+
+// ---------- chart ----------
+function niceTicks(max, n = 5) {
+  if (max <= 0) return [0, 1];
+  const raw = max / n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(s => s * mag).find(s => s >= raw);
+  const out = []; for (let v = 0; v <= max + step * 0.999; v += step) out.push(+v.toFixed(6));
+  return out;
+}
+function lineChart(el, cfg) {
+  const W = Math.max(320, el.clientWidth), Hh = cfg.height || 300;
+  const m = { l: 46, r: 14, t: 10, b: 28 }, iw = W - m.l - m.r, ih = Hh - m.t - m.b;
+  const n = cfg.x.length;
+  const all = cfg.series.flatMap(s => s.values).concat(cfg.band ? cfg.band.hi : []).filter(v => v != null);
+  const ticks = niceTicks(Math.max(1, ...all)), ymax = ticks[ticks.length - 1];
+  const X = i => m.l + (n === 1 ? iw / 2 : (i / (n - 1)) * iw), Yp = v => m.t + ih - (v / ymax) * ih;
+  const yfmt = v => ymax >= 10000 ? (v / 1000) + "k" : v.toLocaleString("en-US");
+  let s = `<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="${cfg.label}">`;
+  for (const t of ticks) {
+    s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Yp(t)}" y2="${Yp(t)}" stroke="var(--grid)" stroke-width="1"/>`;
+    s += `<text x="${m.l - 8}" y="${Yp(t) + 4}" text-anchor="end" font-size="12" fill="var(--ink2)">${yfmt(t)}</text>`;
+  }
+  s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Yp(0)}" y2="${Yp(0)}" stroke="var(--axis)" stroke-width="1"/>`;
+  let lastMonth = "", lastX = -99;
+  for (let i = 0; i < n; i++) {
+    const lab = mon(cfg.x[i]);
+    if (lab !== lastMonth && X(i) - lastX > 62 && X(i) < W - m.r - 20) {
+      s += `<text x="${X(i)}" y="${Hh - 8}" text-anchor="start" font-size="12" fill="var(--ink2)">${lab}</text>`;
+      s += `<line x1="${X(i)}" x2="${X(i)}" y1="${Yp(0)}" y2="${Yp(0) + 4}" stroke="var(--axis)"/>`;
+      lastX = X(i);
+    }
+    lastMonth = lab;
+  }
+  if (cfg.band) {
+    let seg = [], d = "";
+    const flush = () => {
+      if (seg.length > 1) d += "M" + seg.map(i => `${X(i)},${Yp(cfg.band.hi[i])}`).join("L") +
+        "L" + seg.slice().reverse().map(i => `${X(i)},${Yp(cfg.band.lo[i])}`).join("L") + "Z";
+      seg = [];
+    };
+    for (let i = 0; i < n; i++) { if (cfg.band.hi[i] != null) seg.push(i); else flush(); }
+    flush();
+    s += `<path d="${d}" fill="var(--band)"/>`;
+  }
+  if (cfg.mark != null && cfg.mark > 0 && cfg.mark < n)
+    s += `<line x1="${X(cfg.mark)}" x2="${X(cfg.mark)}" y1="${m.t}" y2="${Yp(0)}" stroke="var(--axis)" stroke-dasharray="4 4"/>`;
+  for (const se of cfg.series) {
+    let d = "", pen = false;
+    se.values.forEach((v, i) => { if (v == null) { pen = false; return; } d += (pen ? "L" : "M") + X(i) + "," + Yp(v); pen = true; });
+    s += `<path d="${d}" fill="none" stroke="var(${se.color})" stroke-width="${se.width || 2}" stroke-linejoin="round" stroke-linecap="round"/>`;
+  }
+  s += `<line class="cross" x1="0" x2="0" y1="${m.t}" y2="${Yp(0)}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/>`;
+  cfg.series.forEach((se, k) => s += `<circle class="dot d${k}" r="4.5" fill="var(${se.color})" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>`);
+  s += `<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/></svg><div class="tip"></div>`;
+  el.innerHTML = s;
+  const svg = el.querySelector("svg"), tip = el.querySelector(".tip"), cross = el.querySelector(".cross");
+  const dots = [...el.querySelectorAll(".dot")];
+  const move = ev => {
+    const box = svg.getBoundingClientRect(), px = (ev.clientX - box.left) * (W / box.width);
+    const i = Math.max(0, Math.min(n - 1, Math.round(((px - m.l) / iw) * (n - 1))));
+    cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("visibility", "visible");
+    let html = `<b>Week of ${wk(cfg.x[i])}</b>`;
+    cfg.series.forEach((se, k) => {
+      const v = se.values[i];
+      if (v == null) { dots[k].setAttribute("visibility", "hidden"); return; }
+      dots[k].setAttribute("cx", X(i)); dots[k].setAttribute("cy", Yp(v)); dots[k].setAttribute("visibility", "visible");
+      html += `<div class="r"><span><i style="background:var(${se.color})"></i>${se.name}</span><span>${num(v)}</span></div>`;
+    });
+    if (cfg.band && cfg.band.hi[i] != null)
+      html += `<div class="r"><span><i style="background:var(--band)"></i>80% interval</span><span>${num(cfg.band.lo[i])} to ${num(cfg.band.hi[i])}</span></div>`;
+    if (cfg.extra) html += cfg.extra(i);
+    tip.innerHTML = html; tip.style.display = "block";
+    const sx = X(i) * (box.width / W), left = sx + 14 + tip.offsetWidth > box.width ? sx - tip.offsetWidth - 14 : sx + 14;
+    tip.style.left = left + "px"; tip.style.top = "8px";
+  };
+  const leave = () => { tip.style.display = "none"; cross.setAttribute("visibility", "hidden"); dots.forEach(d => d.setAttribute("visibility", "hidden")); };
+  svg.addEventListener("mousemove", move); svg.addEventListener("mouseleave", leave);
+  svg.addEventListener("touchstart", e => move(e.touches[0]), { passive: true });
+  svg.addEventListener("touchmove", e => move(e.touches[0]), { passive: true });
+}
+const legend = (el, items) => el.innerHTML = items.map(([c, t, box]) => `<span><i class="${box ? "box" : ""}" style="background:var(${c})"></i>${t}</span>`).join("");
+
+// ---------- sections ----------
+function renderSummary() {
+  const prods = selectedProducts();
+  let y = 0, em = 0, eb = 0, sm = 0, inside = 0, rows = 0;
+  const byWeek = new Map();
+  for (const p of prods) for (const r of scoreRows(p)) {
+    y += r[Y]; em += Math.abs(r[M] - r[Y]); eb += Math.abs(r[B] - r[Y]); sm += r[M] - r[Y];
+    inside += (r[Y] >= r[LO] && r[Y] <= r[HI]) ? 1 : 0; rows++;
+    const a = byWeek.get(r[T]) || [0, 0, 0]; a[0] += r[Y]; a[1] += r[M]; a[2] += r[B]; byWeek.set(r[T], a);
+  }
+  const wm = em / y, wb = eb / y, ch = wm / wb - 1;
+  $("k1").textContent = pct(wm);
+  $("k1n").textContent = `${rows.toLocaleString("en-US")} forecasts, ${prods.length} products`;
+  $("k2").textContent = spct(ch); $("k2").style.color = ch < 0 ? "var(--good)" : "var(--bad)";
+  $("k2l").textContent = `Error vs ${D.baseLabel.toLowerCase()} (${pct(wb)})`;
+  $("k2n").textContent = ch < 0 ? "model error is lower" : "model error is higher";
+  $("k3").textContent = spct(sm / y); $("k3n").textContent = sm < 0 ? "forecasts run low" : "forecasts run high";
+  $("k4").textContent = pct(inside / rows, 0);
+  const ts = [...byWeek.keys()].sort((a, b) => a - b);
+  legend($("lg1"), [["--actual", "Actual units sold"], ["--s1", "Model forecast"], ["--s2", "Baseline: " + D.baseLabel.toLowerCase()]]);
+  lineChart($("c1"), { label: "Total weekly demand, actual versus forecast", x: ts, height: 310, series: [
+    { name: "Actual", color: "--actual", values: ts.map(t => byWeek.get(t)[0]) },
+    { name: "Model", color: "--s1", values: ts.map(t => byWeek.get(t)[1]) },
+    { name: "Baseline", color: "--s2", width: 1.6, values: ts.map(t => byWeek.get(t)[2]) }] });
+}
+function renderBars() {
+  const max = Math.max(...D.finalScores.map(r => r.wape));
+  $("bars").innerHTML = D.finalScores.map(r =>
+    `<div class="name ${r.chosen ? "on" : ""}">${r.label}</div>
+     <div class="track" title="${r.label}: WAPE ${pct(r.wape)}, bias ${spct(r.bias, 1)}, weekly-total WAPE ${pct(r.total)}">
+       <div class="fill ${r.chosen ? "on" : ""}" style="width:${(100 * r.wape / max).toFixed(1)}%"></div></div>
+     <div class="val ${r.chosen ? "on" : ""}">${pct(r.wape)}</div>`).join("");
+}
+function fillProducts() {
+  const q = $("search").value.trim().toLowerCase();
+  const list = selectedProducts().filter(p => !q || p.d.toLowerCase().includes(q) || p.s.toLowerCase().includes(q));
+  $("sku").innerHTML = list.map(p => `<option value="${p.s}">${p.d} (${p.s}) · class ${p.a}</option>`).join("");
+  if (!list.some(p => p.s === state.sku)) state.sku = list.length ? list[0].s : null;
+  if (state.sku) $("sku").value = state.sku;
+}
+function renderProduct() {
+  const p = D.products.find(x => x.s === state.sku);
+  if (!p) { $("c2").innerHTML = "<p class='cap'>No product matches.</p>"; $("pstats").textContent = ""; return; }
+  const first = p.u.findIndex(v => v != null), x = [];
+  for (let i = first; i < D.weeks.length; i++) x.push(i);
+  const fc = new Map(p.f.map(r => [r[T], r]));
+  const rows = scoreRows(p);
+  const y = rows.reduce((a, r) => a + r[Y], 0), em = rows.reduce((a, r) => a + Math.abs(r[M] - r[Y]), 0),
+        eb = rows.reduce((a, r) => a + Math.abs(r[B] - r[Y]), 0), sm = rows.reduce((a, r) => a + r[M] - r[Y], 0);
+  $("pstats").innerHTML = y > 0 ? `<span>Model WAPE <b>${pct(em / y)}</b></span><span>Baseline WAPE <b>${pct(eb / y)}</b></span>
+    <span>Bias <b>${spct(sm / y)}</b></span><span>Units in test period <b>${num(y)}</b></span>
+    <span>Class <b>${p.a}</b>, ${p.t}</span>` : "";
+  legend($("lg2"), [["--actual", "Actual"], ["--s1", "Forecast"], ["--band", "80% interval", true]]);
+  lineChart($("c2"), { label: `Weekly units and forecast for ${p.d}`, x, height: 330, mark: x.indexOf(finalStart),
+    series: [{ name: "Actual", color: "--actual", width: 1.6, values: x.map(i => p.u[i]) },
+             { name: "Forecast", color: "--s1", values: x.map(i => fc.has(i) ? fc.get(i)[M] : null) }],
+    band: { lo: x.map(i => fc.has(i) ? fc.get(i)[LO] : null), hi: x.map(i => fc.has(i) ? fc.get(i)[HI] : null) },
+    extra: k => { const r = fc.get(x[k]); return r ? `<div class="r"><span>Made</span><span>${r[H]} wk ahead</span></div>` : ""; } });
+  $("ptable").innerHTML = "<tr><th>Week</th><th>Weeks ahead</th><th>Actual</th><th>Forecast</th><th>Low (10%)</th><th>High (90%)</th><th>Baseline</th><th>Period</th></tr>" +
+    p.f.map(r => `<tr><td>${wk(r[T])}</td><td>${r[H]}</td><td>${num(r[Y])}</td><td>${num(r[M])}</td><td>${num(r[LO])}</td><td>${num(r[HI])}</td><td>${num(r[B])}</td><td>${r[CL] ? "closed" : r[FIN] ? "final test" : "selection"}</td></tr>`).join("");
+}
+function downloadCsv() {
+  const p = D.products.find(x => x.s === state.sku); if (!p) return;
+  const lines = ["week,weeks_ahead,actual,forecast,low_10,high_90,baseline,period"].concat(
+    p.f.map(r => [D.weeks[r[T]], r[H], r[Y], r[M], r[LO], r[HI], r[B], r[CL] ? "closed" : r[FIN] ? "final" : "selection"].join(",")));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+  a.download = `${p.s}_forecast.csv`; a.click(); URL.revokeObjectURL(a.href);
+}
+function renderStatic() {
+  const d = D.design, v = D.vsStrongest, iv = D.interval;
+  const chosen = D.finalScores.find(r => r.chosen), tw = D.finalScores.find(r => r.label.includes("Tweedie"));
+  $("subtitle").textContent = `Weekly unit forecasts, 1 to 4 weeks ahead, for ${D.data.skus_selected} products. ` +
+    `Tested on ${d.folds_final} forecast dates (${wk(D.weeks.indexOf(d.final_first_week))} to ${wk(D.weeks.indexOf(d.final_last_week))}) that were never used to choose the model.`;
+  $("notes").innerHTML = [
+    `<b>WAPE</b> is total absolute error divided by total units sold. ${pct(chosen.wape)} means the forecasts were off by about ${Math.round(100 * chosen.wape)} units for every 100 sold. Weekly demand for single gift products is noisy, so every method has a large error; the comparison between methods is what matters.`,
+    `<b>Against the strongest simple method</b> (${D.strongestLabel.toLowerCase()}), the model's error is ${spct(v.relative_change)} (95% confidence interval ${spct(v.relative_ci95[0])} to ${spct(v.relative_ci95[1])}).`,
+    `<b>Trade-off.</b> The chosen setting forecasts ${Math.abs(Math.round(100 * chosen.bias))}% fewer units than were sold, so its error on total weekly demand (${pct(chosen.total)}) is worse than the simple methods'. The Tweedie setting has a bias of ${spct(tw.bias, 1)} and a weekly-total error of ${pct(tw.total)}, but a product-level error of ${pct(tw.wape)}. Use the chosen setting for a typical week per product and the Tweedie setting or the upper interval bound for total stock.`,
+    `<b>Test design.</b> ${d.folds_total} forecast dates, 4 weeks apart. The first ${d.folds_selection} were used to choose the model setting; the last ${d.folds_final} are the final test shown here. Products were selected from the first year only.`,
+    `<b>Intervals.</b> The 80% interval is calibrated on earlier forecast dates only and covered ${pct(iv.calibrated_coverage_final, 0)} of actual values in the final test.`,
+  ].map(t => `<li>${t}</li>`).join("");
+  $("foot").textContent = `Data: UCI Machine Learning Repository, Online Retail II (CC BY 4.0), ${D.data.raw_rows.toLocaleString("en-US")} raw rows, ` +
+    `${D.data.date_min} to ${D.data.date_max}. Built with Python, pandas and LightGBM. Hover the bars and lines for details.`;
+}
+function render() { renderSummary(); fillProducts(); renderProduct(); }
+
+$("search").addEventListener("input", () => { fillProducts(); renderProduct(); });
+$("sku").addEventListener("change", e => { state.sku = e.target.value; renderProduct(); });
+$("csv").addEventListener("click", downloadCsv);
+$("toggleTable").addEventListener("click", e => {
+  const w = $("tablewrap"), show = w.style.display !== "block";
+  w.style.display = show ? "block" : "none"; e.target.textContent = show ? "Hide table" : "Show table";
+});
+$("theme").addEventListener("click", e => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark"; e.target.textContent = dark ? "Dark mode" : "Light mode";
+});
+if (matchMedia("(prefers-color-scheme: dark)").matches) $("theme").textContent = "Light mode";
+let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(render, 150); });
+renderStatic(); renderBars(); render();
+</script>
+</body>
+</html>

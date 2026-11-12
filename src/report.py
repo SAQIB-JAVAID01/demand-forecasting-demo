@@ -464,7 +464,8 @@ simple averages are hard to beat on this data.
 pip install -r requirements.txt
 python run_all.py            # download, clean, backtest, score, report (about 10 minutes)
 python -m pytest tests -q    # leakage tests
-streamlit run app/dashboard.py
+python app/desktop.py          # PyQt6 desktop app
+python -m src.build_dashboard  # single-file HTML dashboard: app/dashboard.html
 ```
 """
     (C.REPORTS_DIR / "REPORT.md").write_text(text, encoding="utf-8")
