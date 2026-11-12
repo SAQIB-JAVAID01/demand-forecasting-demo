@@ -12,18 +12,19 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, QSettings, QSize, Qt
 from PyQt6.QtGui import QColor, QFont, QFontDatabase
-from PyQt6.QtWidgets import (QApplication, QButtonGroup, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
-                             QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QPushButton, QScrollArea,
-                             QSizePolicy, QStackedWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (QApplication, QButtonGroup, QFileDialog, QFrame, QGraphicsOpacityEffect, QGridLayout,
+                             QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
+                             QPushButton, QScrollArea, QSizePolicy, QSplashScreen, QStackedWidget, QTableWidget,
+                             QTableWidgetItem, QVBoxLayout, QWidget)
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from src import config as C  # noqa: E402
 from src.report import FEATURE_NAMES  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from brand import logo_icon, logo_pixmap, save_assets  # noqa: E402
+from brand import logo_icon, logo_pixmap, save_assets, splash_pixmap  # noqa: E402
 from charts import Chart  # noqa: E402
 from icons import icon  # noqa: E402
 from live import LivePage  # noqa: E402
@@ -93,9 +94,11 @@ def qss(t: dict) -> str:
     QLabel#flabel {{ color: {t['muted']}; font-size: 7.5pt; font-weight: 600; letter-spacing: 1px; }}
     QLabel#hero1 {{ font-size: 13.5pt; font-weight: 600; background: transparent; }}
     QLabel#hero2 {{ color: {t['ink2']}; font-size: 9.8pt; background: transparent; }}
-    QLabel#kv, QWidget#kv {{ font-size: 22pt; font-weight: 600; }}
+    QLabel#kv, QWidget#kv {{ font-size: 27pt; font-weight: 600; }}
+    QWidget#chip {{ font-size: 8.4pt; font-weight: 600; }}
+    QLabel#heroBig {{ font-size: 16pt; font-weight: 700; background: transparent; }}
     QWidget#badge {{ font-size: 8pt; font-weight: 700; }}
-    QLabel#kl, QWidget#kl {{ color: {t['ink2']}; font-size: 8.8pt; font-weight: 500; }}
+    QLabel#kl, QWidget#kl {{ color: {t['ink2']}; font-size: 9pt; font-weight: 500; }}
     QLabel#kn, QWidget#kn {{ color: {t['muted']}; font-size: 8.8pt; }}
     QLabel#eyebrow {{ color: {t['muted']}; font-size: 7.5pt; font-weight: 600; letter-spacing: 1px; }}
     QLabel#info {{ color: {t['muted']}; font-size: 10pt; }}
@@ -143,6 +146,13 @@ def pct(x: float, d: int = 1) -> str:
 
 def spct(x: float, d: int = 0) -> str:
     return f"{100 * x:+.{d}f}%"
+
+
+def chip_css(color: str) -> str:
+    """Rounded status pill: the status colour on a 14% tint of itself."""
+    c = QColor(color)
+    return (f"background: rgba({c.red()},{c.green()},{c.blue()},0.14); color: {color}; border-radius: 10px; "
+            f"padding: 3px 10px; font-size: 8.4pt; font-weight: 600;")
 
 
 def label(text: str = "", name: str = "", wrap: bool = False) -> QLabel:
@@ -232,7 +242,12 @@ class Window(QMainWindow):
         self.setWindowTitle("Demand Forecasting Studio")
         self.setWindowIcon(logo_icon())
         self.resize(1480, 940)
-        self.theme = "light"
+        self.settings = QSettings("Saqib Jawed", "Demand Forecasting Studio")
+        self.theme = str(self.settings.value("theme", "dark"))     # dark on first launch, then the last choice
+        if self.theme not in THEMES:
+            self.theme = "dark"
+        self.persist = self.animate = True
+        self._fade = None
         self.preds = pd.read_parquet(C.PROCESSED_DIR / "predictions.parquet")
         self.panel = pd.read_parquet(C.PROCESSED_DIR / "panel.parquet")
         self.cal = pd.read_parquet(C.PROCESSED_DIR / "calendar.parquet")
@@ -333,7 +348,7 @@ class Window(QMainWindow):
         sl.setVerticalSpacing(7)
         sl.addWidget(label("FINAL TEST SNAPSHOT", "navsec"), 0, 0, 1, 2)
         self.snap = []
-        for r_, text in enumerate(("Forecast error", "vs 13-week average", "Products improved", "Inside 80% range"), 1):
+        for r_, text in enumerate(("Accuracy gain", "Total-demand accuracy", "Products improved", "Inside 80% range"), 1):
             v = label("", "navval")
             v.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             sl.addWidget(label(text), r_, 0)
@@ -396,25 +411,29 @@ class Window(QMainWindow):
         hl = QVBoxLayout(hero)
         hl.setContentsMargins(24, 20, 24, 20)
         hl.setSpacing(6)
-        self.hero1, self.hero2 = label("", "hero1", True), label("", "hero2", True)
+        self.hero1, self.hero2 = label("", "heroBig", True), label("", "hero2", True)
+        self.hero1.setTextFormat(Qt.TextFormat.RichText)
         hl.addWidget(self.hero1)
         hl.addWidget(self.hero2)
         lay.addWidget(hero)
         self.k = []
         krow = QHBoxLayout()
         krow.setSpacing(16)
-        for title in ("Forecast error", "Against the best simple method", "Forecast level", "Range reliability"):
+        for title in ("Accuracy gain vs benchmark", "Total-demand accuracy", "Products improved", "Inside the 80% range"):
             f = QFrame()
             f.setObjectName("card")
             l = QVBoxLayout(f)
             l.setContentsMargins(20, 16, 20, 16)
             l.setSpacing(4)
-            val, note = label("", "kv"), label("", "kn", True)
+            val, note, chip = label("", "kv"), label("", "kn", True), label("")
             l.addWidget(label(title, "kl"))
             l.addWidget(val)
+            l.addWidget(chip, 0, Qt.AlignmentFlag.AlignLeft)
+            l.addSpacing(2)
             l.addWidget(note)
+            l.addStretch(1)
             krow.addWidget(f)
-            self.k.append((val, note))
+            self.k.append((val, note, chip))
         lay.addLayout(krow)
         self.s_total, self.s_methods = Card("Forecast vs actual", 290), Card("Method comparison", 290)
         self._row(lay, self.s_total, self.s_methods, stretch=(3, 2), weight=1)
@@ -498,7 +517,20 @@ class Window(QMainWindow):
 
     # ================= state =================
     def go(self, i: int):
+        changed = i != self.stack.currentIndex()
         self.stack.setCurrentIndex(i)
+        if changed and self.animate and self.isVisible():
+            page = self.stack.currentWidget()
+            eff = QGraphicsOpacityEffect(page)
+            page.setGraphicsEffect(eff)
+            anim = QPropertyAnimation(eff, b"opacity", self)
+            anim.setDuration(240)
+            anim.setStartValue(0.0)
+            anim.setEndValue(1.0)
+            anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+            anim.finished.connect(lambda pg_=page: pg_.setGraphicsEffect(None))
+            anim.start()
+            self._fade = anim
         self.live.activate(PAGES[i][0] == "Live replay")
         self.nav_group.button(i).setChecked(True)
         self.title.setText(PAGES[i][0])
@@ -555,9 +587,11 @@ class Window(QMainWindow):
 
         # ----- headline -----
         if gain:
-            h1 = f"The forecast is {abs(100 * ch):.0f}% more accurate per product than the best simple method."
+            h1 = (f"The forecast is <span style='color:{t['good']}'>{abs(100 * ch):.0f}% more accurate</span> per product "
+                  f"than the best simple method.")
         elif loss:
-            h1 = f"The forecast is {abs(100 * ch):.0f}% less accurate per product than the best simple method."
+            h1 = (f"The forecast is <span style='color:{t['bad']}'>{abs(100 * ch):.0f}% less accurate</span> per product "
+                  f"than the best simple method.")
         else:
             h1 = "Per product, the forecast is about as accurate as the best simple method. The difference is not clear."
         if bs < -0.10:
@@ -571,26 +605,45 @@ class Window(QMainWindow):
         self.hero2.setText(f"{h2}  Based on {len(fin):,} weekly forecasts for {fin['sku'].nunique()} products, "
                            f"{self.final_start:%d %b %Y} to {self.final_end:%d %b %Y}: a period never used to build or tune the model.")
 
-        sv_ = [pct(wm), spct(ch), None, pct(cov, 0)]
-        self.k[0][0].setText(pct(wm))
-        self.k[0][1].setText(f"Off by about {100 * wm:.0f} units for every 100 sold, per product and week.")
-        self.k[1][0].setText(spct(ch))
-        self.k[1][0].setStyleSheet(f"color: {t['good'] if gain else t['bad'] if loss else t['warn']};")
-        self.k[1][1].setText(f"The {BASE_LABEL} has {pct(wb)} error. 95% confidence range: {spct(lo)} to {spct(hi)}"
-                             f"{'' if (gain or loss) else ' (includes zero)'}.")
-        self.k[2][0].setText(spct(bs))
-        self.k[2][0].setStyleSheet(f"color: {t['bad'] if abs(bs) > 0.10 else t['good']};")
-        self.k[2][1].setText("Forecast units against actual units. "
-                             + ("Runs low." if bs < -0.03 else "Runs high." if bs > 0.03 else "On target."))
-        self.k[3][0].setText(pct(cov, 0))
-        self.k[3][0].setStyleSheet(f"color: {t['good'] if abs(cov - 0.8) <= 0.05 else t['warn']};")
-        self.k[3][1].setText("of actual weeks fell inside the 80% range. Target: 80%.")
-
-        # ----- summary charts -----
         g = fin.groupby("week")[["y", mdl, BASE]].sum()
         te = float((g[mdl] - g["y"]).abs().sum() / g["y"].sum())
         tb_ = float((g[BASE] - g["y"]).abs().sum() / g["y"].sum())
-        self.s_total.say(f"On total weekly demand the forecast is off by {pct(te, 0)}; the simple method by {pct(tb_, 0)}.",
+        ps = fin.groupby("sku").apply(lambda d: pd.Series({
+            "units": d["y"].sum(), "fc": d[mdl].sum(),
+            "wm": self.wape(d, mdl) if d["y"].sum() > 0 else np.nan,
+            "wb": self.wape(d, BASE) if d["y"].sum() > 0 else np.nan}), include_groups=False).dropna()
+        share = float((ps["wm"] < ps["wb"]).mean())
+        sv_ = [f"{-100 * ch:+.1f}%", pct(1 - te), pct(share, 0), pct(cov, 0)]
+        cov_ok = abs(cov - 0.8) <= 0.05
+        dt = tb_ - te
+        inter = ("Accuracy = 1 - WAPE. Single gift products sell in small, irregular amounts week to week, so per-product "
+                 "accuracy is low for every method; the gain over the benchmark is what the model adds.")
+        kpis = [
+            (f"{-100 * ch:+.1f}%", "✓ More accurate than the 13-week average" if gain else
+             "✕ Less accurate than the 13-week average" if loss else "≈ Not a clear difference",
+             t["good"] if gain else t["bad"] if loss else t["warn"],
+             f"Per-product accuracy {pct(1 - wm, 0)} vs {pct(1 - wb, 0)}. 95% range of the gain {-100 * hi:+.0f}% to "
+             f"{-100 * lo:+.0f}%.", inter),
+            (pct(1 - te), f"{'↑' if dt >= 0 else '↓'} {abs(100 * dt):.1f} pts vs benchmark",
+             t["good"] if dt >= 0 else (t["warn"] if dt > -0.05 else t["bad"]),
+             f"Weekly total, all products in the filter. Forecast level {spct(bs)} of units sold.",
+             "1 - WAPE of the weekly total: how close the total order quantity would have been. For totals, the "
+             "\"Unbiased totals\" setting is the better choice."),
+            (pct(share, 0), f"{int(round(share * len(ps)))} of {len(ps)} products", t["s1"],
+             "Products where the model's error is below the benchmark's.", ""),
+            (pct(cov, 0), "● On the 80% target" if cov_ok else ("↑ Above the 80% target" if cov > 0.8 else "↓ Below the 80% target"),
+             t["good"] if cov_ok else t["warn"], "Share of actual weeks inside the 80% range.", ""),
+        ]
+        for (val, note, chip), (v_, c_text, c_col, n_, tip) in zip(self.k, kpis):
+            val.setText(v_)
+            val.setStyleSheet("")
+            chip.setText(c_text)
+            chip.setStyleSheet(chip_css(c_col))
+            note.setToolTip(f"<div style='max-width:320px'>{tip}</div>" if tip else "")
+            note.setText(n_)
+
+        # ----- summary charts -----
+        self.s_total.say(f"Total weekly demand: {pct(1 - te, 0)} accurate; the 13-week average {pct(1 - tb_, 0)}.",
                          "Grey = units actually sold. Blue = forecast made 1 to 4 weeks earlier. Orange = simple method. "
                          "Move the mouse over the chart for values.")
         self.s_total.chart.lines(t, g.index, [
@@ -608,12 +661,6 @@ class Window(QMainWindow):
         self.s_methods.chart.hbars(t, [names[c] for _, c in sc], [v for v, _ in sc],
                                    ["s1" if c == mdl else "neutral" for _, c in sc])
 
-        ps = fin.groupby("sku").apply(lambda d: pd.Series({
-            "units": d["y"].sum(), "fc": d[mdl].sum(),
-            "wm": self.wape(d, mdl) if d["y"].sum() > 0 else np.nan,
-            "wb": self.wape(d, BASE) if d["y"].sum() > 0 else np.nan}), include_groups=False).dropna()
-        share = float((ps["wm"] < ps["wb"]).mean())
-        sv_[2] = pct(share, 0)
         for lab_, v_ in zip(self.snap, sv_):
             lab_.setText(v_)
         other = "gbm_tweedie" if mdl == "gbm_log" else "gbm_log"
@@ -792,7 +839,7 @@ class Window(QMainWindow):
         name = f"{str(row['description']).title()} ({self.sku})"
         if len(fin) and fin["y"].sum() > 0:
             wm, wb, bs = self.wape(fin, self.model), self.wape(fin, BASE), self.bias(fin, self.model)
-            self.e_card.say(f"{name}: forecast error {pct(wm, 0)}, {'better' if wm < wb else 'worse'} than the simple method ({pct(wb, 0)}).",
+            self.e_card.say(f"{name}: {pct(1 - wm, 0)} accurate, {'ahead of' if wm < wb else 'behind'} the 13-week average ({pct(1 - wb, 0)}).",
                             f"Class {row['abc']}, {row['demand_type']} seller. {fin['y'].sum():,.0f} units sold in the test period, "
                             f"forecast level {spct(bs)}. Grey = actual, blue = forecast, light blue = 80% range, "
                             f"dashed line = start of the final test.")
@@ -877,23 +924,29 @@ class Window(QMainWindow):
 
     def toggle_theme(self):
         self.theme = "dark" if self.theme == "light" else "light"
+        if self.persist:
+            self.settings.setValue("theme", self.theme)
         self.apply_theme()
 
 
+LIVE = 1                                     # index of the live replay page
+
+
 def live_shots(w, app, out: Path):
-    """Frames of the real-time page: all products (light), one product and a class (dark)."""
+    """Frames of the real-time page: all products, one product and a class (dark), and all products in light."""
     from catalog import full_page
     out.mkdir(parents=True, exist_ok=True)
     w.show()
-    live = PAGES.index(next(p for p in PAGES if p[0] == "Live replay"))
-    if w.theme != "light":
+    live = LIVE
+    if w.theme != "dark":
         w.toggle_theme()
     w.go(live)
     top = w.preds.groupby("sku")["y"].sum().idxmax()          # best seller, for the one-product frame
     w.live.cb_prod.setCurrentIndex(max(w.live.cb_prod.findData(top), 0))
-    for pos, scope, theme, name in ((30.45, 0, "light", "2_live_replay.png"),
-                                    (47.6, 6, "dark", "2b_live_replay_product_dark.png"),
-                                    (50.62, 1, "dark", "2c_live_replay_class_a_dark.png")):
+    for pos, scope, theme, name in ((30.45, 0, "dark", "2_live_replay.png"),
+                                    (47.6, 6, "dark", "2b_live_replay_product.png"),
+                                    (50.62, 1, "dark", "2c_live_replay_class_a.png"),
+                                    (30.45, 0, "light", "2_live_replay_light.png")):
         if w.theme != theme:
             w.toggle_theme()
             w.go(live)
@@ -903,8 +956,48 @@ def live_shots(w, app, out: Path):
             app.processEvents()
         full_page(w).save(str(out / name))
     w.live.cb_scope.setCurrentIndex(0)
-    if w.theme != "light":
+    if w.theme != "dark":
         w.toggle_theme()
+
+
+def demo_frames(w, app, out: Path, fps: int = 30) -> int:
+    """Frames for a short screen recording of the live page (dark): 8 s at 1x, then 14 s at 2x.
+
+    The replay is stepped one animation frame per video frame, so the clip plays at the app's real speed.
+    Near the end the hover read-out is shown on the main chart, as when the mouse rests on it.
+    """
+    from catalog import full_page
+    out.mkdir(parents=True, exist_ok=True)
+    for f in out.glob("*.jpg"):
+        f.unlink()
+    w.show()
+    if w.theme != "dark":
+        w.toggle_theme()
+    w.go(LIVE)
+    lv = w.live
+    lv.cb_scope.setCurrentIndex(0)
+    lv.timer.stop()
+    lv.snapshot(29.62)
+    lv.play(True)
+    n, plan = 0, [(1, 8), (2, 14)]
+    total = sum(sec for _, sec in plan) * fps
+    for speed, sec in plan:
+        for b in lv.b_speed:
+            b.setChecked(b.property("value") == speed)
+        lv._on_speed()
+        for _ in range(sec * fps):
+            lv._frame()
+            if n > total - 5 * fps and lv._cur is not None:          # hover read-out, three weeks back
+                vb = lv.p_stream.getPlotItem().vb
+                k = max(lv._cur - 3, 0)
+                lv.h_stream.move(vb.mapViewToScene(QPointF(lv.x[k], lv.S.y[k])))
+            app.processEvents()
+            pm = full_page(w)
+            h = int(pm.width() * 0.75) // 2 * 2
+            pm.copy(0, 0, pm.width() // 2 * 2, min(h, pm.height() // 2 * 2)).save(str(out / f"{n:05d}.jpg"), "JPG", 90)
+            n += 1
+    lv.h_stream.hide()
+    return n
 
 
 def load_fonts() -> str:
@@ -922,13 +1015,23 @@ def main():
     font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
     app.setFont(font)
     app.setWindowIcon(logo_icon())
+    batch = any(a in sys.argv for a in ("--screenshot", "--live-shots", "--catalog", "--demo", "--cover"))
+    splash = None
+    if not batch:
+        splash = QSplashScreen(splash_pixmap())
+        splash.show()
+        app.processEvents()
     w = Window()
+    if batch:                                # image modes never change the saved theme and skip the fades
+        w.persist = w.animate = False
+        if w.theme != "dark":
+            w.toggle_theme()
     if "--screenshot" in sys.argv:           # produce portfolio images without clicking through the app
         out = Path(sys.argv[sys.argv.index("--screenshot") + 1])
         from catalog import full_page
         w.show()
         app.processEvents()
-        for theme in ("light", "dark"):
+        for theme in ("dark", "light"):
             if w.theme != theme:
                 w.toggle_theme()
             for i, (name, _) in enumerate(PAGES):
@@ -937,7 +1040,7 @@ def main():
                     w.live.snapshot(40.55)
                 app.processEvents()
                 app.processEvents()
-                suffix = "" if theme == "light" else "_dark"
+                suffix = "" if theme == "dark" else "_light"
                 full_page(w).save(str(out / f"{i + 1}_{name.lower().replace(' ', '_')}{suffix}.png"))
         w.toggle_theme()
         w.b_model[1].click()
@@ -946,6 +1049,14 @@ def main():
         full_page(w).save(str(out / "1b_summary_unbiased_totals.png"))
         w.b_model[0].click()
         live_shots(w, app, out)
+        return
+    if "--demo" in sys.argv:                 # frames for a short screen recording of the live page
+        n = demo_frames(w, app, Path(sys.argv[sys.argv.index("--demo") + 1]))
+        print(f"{n} frames")
+        return
+    if "--cover" in sys.argv:                # 4:3 cover image for a portfolio or project catalog
+        from catalog import cover
+        cover(w, app, Path(sys.argv[sys.argv.index("--cover") + 1]))
         return
     if "--live-shots" in sys.argv:           # only the real-time page, light and dark
         live_shots(w, app, Path(sys.argv[sys.argv.index("--live-shots") + 1]))
@@ -959,6 +1070,8 @@ def main():
         save_assets(ROOT / "assets")
         return
     w.show()
+    if splash is not None:
+        splash.finish(w)
     sys.exit(app.exec())
 
 

@@ -28,7 +28,7 @@ rcParams["font.family"] = ["Inter", "Segoe UI", "DejaVu Sans"]
 rcParams["axes.unicode_minus"] = False
 
 
-def gradient_fill(ax, x, y, color: str, alpha: float = 0.26):
+def gradient_fill(ax, x, y, color: str, alpha: float = 0.16):
     """Area under a line that fades to transparent at the baseline."""
     x = np.asarray(x, float)
     y = np.nan_to_num(np.asarray(y, float))

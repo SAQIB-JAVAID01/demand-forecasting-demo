@@ -8,7 +8,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import QBrush, QColor, QIcon, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap
+from PyQt6.QtGui import (QBrush, QColor, QFont, QIcon, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
+                         QRadialGradient)
 
 BLUE_TOP, BLUE_BOTTOM, ORANGE = "#3b8bea", "#1b57a8", "#f2783f"
 
@@ -51,6 +52,48 @@ def logo_icon() -> QIcon:
     for size in (16, 24, 32, 48, 64, 128, 256):
         icon.addPixmap(logo_pixmap(size))
     return icon
+
+
+def splash_pixmap(w: int = 640, h: int = 360) -> QPixmap:
+    """Start-up card shown while the data loads: dark surface, soft blue glow, logo and name."""
+    pm = QPixmap(w, h)
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    card = QPainterPath()
+    card.addRoundedRect(QRectF(0, 0, w, h), 18, 18)
+    p.fillPath(card, QColor("#0b0e13"))
+    glow = QRadialGradient(QPointF(w * 0.82, h * 0.05), w * 0.75)
+    glow.setColorAt(0, QColor(59, 139, 234, 95))
+    glow.setColorAt(1, QColor(59, 139, 234, 0))
+    p.fillPath(card, QBrush(glow))
+    p.setPen(QPen(QColor(255, 255, 255, 22), 1))
+    p.drawPath(card)
+    p.drawPixmap(44, 52, logo_pixmap(76))
+    p.setPen(QColor("#ffffff"))
+    f = QFont("Inter", 22)
+    f.setWeight(QFont.Weight.Bold)
+    p.setFont(f)
+    p.drawText(QRectF(44, 150, w - 88, 44), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+               "Demand Forecasting Studio")
+    p.setPen(QColor("#a3abb7"))
+    p.setFont(QFont("Inter", 11))
+    p.drawText(QRectF(44, 196, w - 88, 28), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+               "Weekly forecasts for 200 products, tested on a year never used to build them")
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QColor("#1a2029"))
+    p.drawRoundedRect(QRectF(44, h - 70, w - 88, 4), 2, 2)
+    bar = QLinearGradient(44, 0, w * 0.6, 0)
+    bar.setColorAt(0, QColor("#5b8def"))
+    bar.setColorAt(1, QColor("#8b5cf6"))
+    p.setBrush(QBrush(bar))
+    p.drawRoundedRect(QRectF(44, h - 70, (w - 88) * 0.62, 4), 2, 2)
+    p.setPen(QColor("#6e7887"))
+    p.setFont(QFont("Inter", 9))
+    p.drawText(QRectF(44, h - 56, w - 88, 24), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+               "Loading the sales history and forecasts…")
+    p.end()
+    return pm
 
 
 SVG = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
