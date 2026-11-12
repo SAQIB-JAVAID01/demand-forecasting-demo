@@ -10,24 +10,21 @@ import json
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("QtAgg")
-import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
-                             QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QPushButton, QScrollArea,
+                             QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QPushButton, QScrollArea, QSlider,
                              QSizePolicy, QStackedWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from src import config as C  # noqa: E402
 from src.report import FEATURE_NAMES  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from brand import logo_icon, logo_pixmap, save_assets  # noqa: E402
+from charts import Chart  # noqa: E402
 
 BASE = "ma13"                       # strongest simple method on the final test (the tougher comparison)
 BASE_LABEL = "13-week average"
@@ -38,12 +35,12 @@ THEMES = {
                   grid="#e5e7eb", axis="#cbd5e1", border="#e5e7eb", s1="#2a78d6", s2="#eb6834",
                   actual="#475569", band="#cde2fb", neutral="#cbd5e1", chip="#eef0f3", nav="#0f1b2d",
                   navink="#cbd5e1", navsel="#1d3557", good="#0a7d32", bad="#c0392b", warn="#b45309",
-                  sel="#e4eefb", tint="#f1f6fd", soft="#9ec5f4"),
+                  sel="#e4eefb", tint="#f1f6fd", soft="#9ec5f4", track="#eef1f5"),
     "dark": dict(page="#0b0f17", surface="#141a24", ink="#f1f5f9", ink2="#cbd5e1", muted="#7c8799",
                  grid="#232b38", axis="#334155", border="#232b38", s1="#3987e5", s2="#d95926",
                  actual="#cbd5e1", band="#104281", neutral="#3b4556", chip="#1e2633", nav="#070a10",
                  navink="#94a3b8", navsel="#16233a", good="#34c36b", bad="#f07171", warn="#f5a524",
-                 sel="#17304f", tint="#111c2e", soft="#1c5cab"),
+                 sel="#17304f", tint="#111c2e", soft="#1c5cab", track="#1c2431"),
 }
 
 
@@ -67,6 +64,13 @@ def qss(t: dict) -> str:
     QFrame#hero {{ background: {t['tint']}; border: 1px solid {t['border']}; border-left: 5px solid {t['s1']};
                    border-radius: 12px; }}
     QFrame#hero QWidget {{ background: {t['tint']}; }}
+    QFrame#hero QPushButton {{ background: {t['surface']}; color: {t['ink']}; border: 1px solid {t['border']}; }}
+    QFrame#hero QPushButton:hover {{ background: {t['chip']}; }}
+    QFrame#hero QPushButton:checked {{ background: {t['ink']}; color: {t['surface']}; }}
+    QFrame#hero QPushButton#primary {{ background: {t['s1']}; color: #ffffff; font-weight: 600; border: none; }}
+    QSlider::groove:horizontal {{ height: 6px; background: {t['grid']}; border-radius: 3px; }}
+    QSlider::sub-page:horizontal {{ background: {t['s1']}; border-radius: 3px; }}
+    QSlider::handle:horizontal {{ background: {t['s1']}; width: 16px; margin: -5px 0; border-radius: 8px; }}
     QLabel#title {{ font-size: 16pt; font-weight: 700; }}
     QLabel#sub {{ color: {t['ink2']}; }}
     QLabel#flabel {{ color: {t['muted']}; font-size: 8.5pt; font-weight: 600; }}
@@ -115,242 +119,6 @@ def label(text: str = "", name: str = "", wrap: bool = False) -> QLabel:
     return lb
 
 
-class Chart(FigureCanvasQTAgg):
-    """Matplotlib canvas in the app's style, with a hover read-out on line charts."""
-
-    def __init__(self, height: int = 280):
-        self.fig = Figure(figsize=(6, 3), dpi=100)
-        super().__init__(self.fig)
-        self.setMinimumHeight(height)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.ax = self.fig.add_subplot(111)
-        self.t = THEMES["light"]
-        self._hover = None
-        self.mpl_connect("motion_notify_event", self._on_move)
-        self.mpl_connect("axes_leave_event", self._on_leave)
-        self.mpl_connect("resize_event", self._on_resize)
-
-    def _on_resize(self, _):
-        try:
-            self.fig.tight_layout(pad=0.9)
-        except Exception:
-            pass
-
-    def _base(self, t: dict, grid: str = "y"):
-        self.t = t
-        self._hover = None
-        ax = self.ax
-        ax.clear()
-        self.fig.set_facecolor(t["surface"])
-        ax.set_facecolor(t["surface"])
-        for side in ("top", "right"):
-            ax.spines[side].set_visible(False)
-        for side in ("left", "bottom"):
-            ax.spines[side].set_visible(True)
-            ax.spines[side].set_color(t["axis"])
-        ax.tick_params(colors=t["muted"], labelcolor=t["ink2"], labelsize=9, length=3)
-        ax.grid(False)
-        ax.grid(axis=grid, color=t["grid"], linewidth=0.8)
-        ax.set_axisbelow(True)
-        return ax
-
-    def _legend(self, ncols: int = 4):
-        leg = self.ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncols=ncols, frameon=False, fontsize=9,
-                             handlelength=1.5, borderaxespad=0.2, columnspacing=1.4)
-        for txt in leg.get_texts():
-            txt.set_color(self.t["ink2"])
-
-    def _done(self):
-        try:
-            self.fig.tight_layout(pad=0.9)
-        except Exception:
-            pass
-        self.draw_idle()
-
-    # ----- chart types -----
-    def lines(self, t, x, series, band=None, mark=None, shade=None, extra=None):
-        ax = self._base(t)
-        x = pd.DatetimeIndex(x)
-        if shade is not None:
-            ax.axvspan(shade[0], shade[1], color=t["band"], alpha=0.45, linewidth=0, label=shade[2])
-        if band is not None:
-            ax.fill_between(x, band[0], band[1], color=t["band"], linewidth=0, label="80% range")
-        for s in series:
-            ax.plot(x, s["values"], color=t[s["color"]], linewidth=s.get("width", 2.2), label=s["name"],
-                    solid_capstyle="round")
-        if mark is not None:
-            ax.axvline(mark, color=t["axis"], linewidth=1, linestyle="--")
-        ax.set_ylim(0, None)
-        ax.margins(x=0.01)
-        top = ax.get_ylim()[1]
-        ax.yaxis.set_major_formatter(lambda v, _: f"{v / 1000:.0f}k" if top >= 10000 else f"{v:,.0f}")
-        ax.xaxis.set_major_locator(mdates.AutoDateLocator(maxticks=8))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
-        self._legend()
-        self._hover = dict(x=x, xnum=mdates.date2num(x.to_pydatetime()), series=series, band=band, extra=extra,
-                           line=ax.axvline(x[0], color=t["muted"], linewidth=1, visible=False),
-                           note=ax.annotate("", xy=(0, 0), xytext=(12, -12), textcoords="offset points",
-                                            va="top", fontsize=9, color=t["ink"], visible=False, zorder=10,
-                                            bbox=dict(boxstyle="round,pad=0.5", fc=t["surface"], ec=t["axis"], lw=1)))
-        self._done()
-
-    def hbars(self, t, labels, values, colors, fmt=pct, signed=False):
-        ax = self._base(t, grid="x")
-        y = np.arange(len(labels))[::-1]
-        ax.barh(y, values, height=0.62, color=[t[c] for c in colors])
-        span = max(abs(min(values + [0])), abs(max(values + [0]))) or 1
-        for yi, v, c in zip(y, values, colors):
-            ax.text(v + span * 0.015 if v >= 0 else span * 0.015, yi, fmt(v), va="center",
-                    ha="left", fontsize=9, color=t["ink"],
-                    fontweight="bold" if c == "s1" else "normal")
-        ax.set_yticks(y, labels)
-        ax.set_xlim(min(0, min(values)) * 1.04, max(values + [0]) + span * 0.18)
-        ax.xaxis.set_major_formatter(lambda v, _: f"{100 * v:.0f}%" if fmt is pct else fmt(v))
-        ax.spines["left"].set_visible(False)
-        ax.tick_params(axis="y", length=0)
-        if signed:
-            ax.axvline(0, color=t["axis"], linewidth=1)
-        self._done()
-
-    def grouped(self, t, labels, a, b, name_a, name_b, horizontal=True):
-        """Two bars per category: a = model (blue), b = simple method (orange)."""
-        ax = self._base(t, grid="x" if horizontal else "y")
-        n = np.arange(len(labels))
-        top = max(a + b) * 1.17
-        if horizontal:
-            y = n[::-1]
-            ax.barh(y + 0.19, a, height=0.34, color=t["s1"], label=name_a)
-            ax.barh(y - 0.19, b, height=0.34, color=t["s2"], label=name_b)
-            for yi, va, vb in zip(y, a, b):
-                ax.text(va + top * 0.008, yi + 0.19, pct(va), va="center", fontsize=8.5, color=t["ink"], fontweight="bold")
-                ax.text(vb + top * 0.008, yi - 0.19, pct(vb), va="center", fontsize=8.5, color=t["ink"])
-            ax.set_yticks(y, labels)
-            ax.set_xlim(0, top)
-            ax.xaxis.set_major_formatter(lambda v, _: f"{100 * v:.0f}%")
-            ax.spines["left"].set_visible(False)
-            ax.tick_params(axis="y", length=0)
-        else:
-            ax.bar(n - 0.19, a, width=0.34, color=t["s1"], label=name_a)
-            ax.bar(n + 0.19, b, width=0.34, color=t["s2"], label=name_b)
-            for xi, va, vb in zip(n, a, b):
-                ax.text(xi - 0.19, va + top * 0.012, pct(va), ha="center", fontsize=8.5, color=t["ink"], fontweight="bold")
-                ax.text(xi + 0.19, vb + top * 0.012, pct(vb), ha="center", fontsize=8.5, color=t["ink"])
-            ax.set_xticks(n, labels)
-            ax.set_ylim(0, top)
-            ax.yaxis.set_major_formatter(lambda v, _: f"{100 * v:.0f}%")
-        self._legend()
-        self._done()
-
-    def vbars(self, t, labels, values, colors, target=None, target_label="", fmt=pct, ymax=None, signed=False,
-              inside=False):
-        ax = self._base(t)
-        n = np.arange(len(labels))
-        ax.bar(n, values, width=0.6, color=[t[c] for c in colors])
-        span = max(abs(min(values + [0])), abs(max(values + [0]))) or 1
-        for xi, v in zip(n, values):
-            if inside:
-                ax.text(xi, v - span * 0.04, fmt(v), ha="center", va="top", fontsize=10, color="#ffffff", fontweight="bold")
-            else:
-                ax.text(xi, v + (span * 0.025 if v >= 0 else -span * 0.025), fmt(v), ha="center",
-                        va="bottom" if v >= 0 else "top", fontsize=9, color=t["ink"])
-        if target is not None:
-            ax.axhline(target, color=t["ink2"], linewidth=1.2, linestyle="--", label=target_label)
-            self._legend()
-        if signed:
-            ax.axhline(0, color=t["axis"], linewidth=1)
-        ax.set_xticks(n, labels)
-        lo = min(0, min(values)) - (span * 0.2 if min(values) < 0 else 0)
-        ax.set_ylim(lo, ymax if ymax else max(values + [0]) + span * 0.2)
-        ax.yaxis.set_major_formatter(lambda v, _: f"{100 * v:.0f}%" if fmt is pct else fmt(v))
-        self._done()
-
-    def scatter(self, t, x, y, colors, xlabel, ylabel):
-        ax = self._base(t, grid="both")
-        lo, hi = max(1, min(x.min(), y.min()) * 0.8), max(x.max(), y.max()) * 1.25
-        ax.plot([lo, hi], [lo, hi], color=t["ink2"], linewidth=1.2, linestyle="--", label="Perfect forecast")
-        for c, name in (("s1", "Model beats the simple method"), ("s2", "Simple method is better")):
-            k = [i for i, v in enumerate(colors) if v == c]
-            ax.scatter(x[k], y[k], s=36, color=t[c], edgecolors=t["surface"], linewidths=0.8, label=name)
-        ax.set_xscale("log")
-        ax.set_yscale("log")
-        ax.set_xlim(lo, hi)
-        ax.set_ylim(lo, hi)
-        for axis in (ax.xaxis, ax.yaxis):
-            axis.set_major_formatter(lambda v, _: f"{v / 1000:.0f}k" if v >= 1000 else f"{v:,.0f}")
-            axis.set_minor_formatter(lambda v, _: "")
-        ax.set_xlabel(xlabel, color=t["ink2"], fontsize=9)
-        ax.set_ylabel(ylabel, color=t["ink2"], fontsize=9)
-        self._legend(ncols=1)
-        self._done()
-
-    def hist(self, t, values, bins, xlabel):
-        ax = self._base(t)
-        counts, edges = np.histogram(values, bins=bins)
-        mids = (edges[:-1] + edges[1:]) / 2
-        ax.bar(mids, counts, width=(edges[1] - edges[0]) * 0.88, color=[t["s1"] if m < 0 else t["s2"] for m in mids])
-        ax.axvline(0, color=t["ink2"], linewidth=1.2, linestyle="--")
-        ax.xaxis.set_major_formatter(lambda v, _: f"{100 * v:+.0f}%")
-        ax.set_xlabel(xlabel, color=t["ink2"], fontsize=9)
-        ax.set_ylabel("Number of products", color=t["ink2"], fontsize=9)
-        self._done()
-
-    def timeline(self, t, folds, weeks):
-        ax = self._base(t, grid="x")
-        x0 = mdates.date2num(weeks[0])
-        seen = set()
-        for i, (cut, kind) in enumerate(folds):
-            yy = len(folds) - 1 - i
-            c = mdates.date2num(weeks[cut])
-            ax.barh(yy, c + 7 - x0, left=x0, height=0.55, color=t["neutral"],
-                    label=None if "h" in seen else "History the model can see")
-            seen.add("h")
-            ax.barh(yy, 28, left=c + 7, height=0.55, color=t["soft"] if kind == "selection" else t["s1"],
-                    label=None if kind in seen else {"selection": "4 weeks forecast: used to choose settings",
-                                                     "final": "4 weeks forecast: final test"}[kind])
-            seen.add(kind)
-        ax.xaxis_date()
-        ax.xaxis.set_major_locator(mdates.MonthLocator(bymonth=(1, 7)))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
-        ax.set_yticks([len(folds) - 1, 0], ["First\nforecast date", "Last\nforecast date"])
-        ax.spines["left"].set_visible(False)
-        ax.tick_params(axis="y", length=0)
-        self._legend(ncols=1)
-        self._done()
-
-    # ----- hover -----
-    def _on_move(self, ev):
-        h = self._hover
-        if not h or ev.inaxes is not self.ax or ev.xdata is None:
-            return
-        i = int(np.abs(h["xnum"] - ev.xdata).argmin())
-        rows = [f"Week of {h['x'][i]:%d %b %Y}"]
-        for s in h["series"]:
-            v = s["values"][i]
-            if v is not None and not np.isnan(v):
-                rows.append(f"{s['name']}: {v:,.0f}")
-        if h["band"] is not None and not np.isnan(h["band"][1][i]):
-            rows.append(f"80% range: {h['band'][0][i]:,.0f} to {h['band'][1][i]:,.0f}")
-        if h["extra"]:
-            e = h["extra"](i)
-            if e:
-                rows.append(e)
-        h["line"].set_xdata([h["x"][i], h["x"][i]])
-        h["line"].set_visible(True)
-        right = i > len(h["x"]) * 0.6
-        h["note"].set_text("\n".join(rows))
-        h["note"].xy = (h["xnum"][i], self.ax.get_ylim()[1])
-        h["note"].set_ha("right" if right else "left")
-        h["note"].xyann = (-12 if right else 12, -12)
-        h["note"].set_visible(True)
-        self.draw_idle()
-
-    def _on_leave(self, _):
-        if self._hover:
-            self._hover["line"].set_visible(False)
-            self._hover["note"].set_visible(False)
-            self.draw_idle()
-
-
 class Card(QFrame):
     """A card: category line, a plain-language finding, optional chart or text, and how to read it."""
 
@@ -393,6 +161,7 @@ class NumItem(QTableWidgetItem):
 
 
 PAGES = [("Executive summary", "The answer in one screen"),
+         ("Live replay", "Watch a year of demand arrive week by week, with each forecast drawn before its week"),
          ("Forecast accuracy", "Where the forecast is strong and where it is weak"),
          ("Products", "How every product performed in the final test"),
          ("Product explorer", "History, forecast and range for one product"),
@@ -415,6 +184,7 @@ class Window(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Demand Forecasting Studio")
+        self.setWindowIcon(logo_icon())
         self.resize(1480, 940)
         self.theme = "light"
         self.preds = pd.read_parquet(C.PROCESSED_DIR / "predictions.parquet")
@@ -426,6 +196,10 @@ class Window(QMainWindow):
         self.final_end = self.preds["week"].max()
         self.sku = None
         self._ci_cache = {}
+        self.rp_k = 0
+        self.timer = QTimer(self)
+        self.timer.setInterval(800)
+        self.timer.timeout.connect(self.tick)
         self._build()
         self.apply_theme()
 
@@ -476,9 +250,18 @@ class Window(QMainWindow):
         n = QVBoxLayout(nav)
         n.setContentsMargins(14, 20, 14, 16)
         n.setSpacing(4)
-        brand = label("Demand Forecasting\nStudio")
-        brand.setStyleSheet("font-size: 13.5pt; font-weight: 700;")
-        n.addWidget(brand)
+        head = QHBoxLayout()
+        head.setSpacing(11)
+        mark = QLabel()
+        mark.setPixmap(logo_pixmap(132))
+        mark.setScaledContents(True)
+        mark.setFixedSize(44, 44)
+        head.addWidget(mark)
+        brand = label("Demand\nForecasting Studio")
+        brand.setStyleSheet("font-size: 12pt; font-weight: 700;")
+        head.addWidget(brand, 1)
+        n.addLayout(head)
+        n.addSpacing(6)
         n.addWidget(label("UK online retailer · 200 products", "navsub"))
         n.addSpacing(18)
         self.nav_group = QButtonGroup(self)
@@ -568,7 +351,76 @@ class Window(QMainWindow):
         self.s_take, self.s_hist = Card("What this means for the business", text=True), Card("Two years of demand", 240)
         self._row(lay, self.s_take, self.s_hist, stretch=(2, 3), weight=1)
 
-        # ----- 2 accuracy -----
+        # ----- live replay -----
+        lay = self._page()
+        ctl = QFrame()
+        ctl.setObjectName("hero")
+        cl = QHBoxLayout(ctl)
+        cl.setContentsMargins(20, 14, 20, 14)
+        cl.setSpacing(8)
+        txt = QVBoxLayout()
+        txt.setSpacing(2)
+        self.l_week, self.l_status = label("", "hero1"), label("", "hero2", True)
+        txt.addWidget(self.l_week)
+        txt.addWidget(self.l_status)
+        cl.addLayout(txt, 1)
+        self.b_play = QPushButton("Play")
+        self.b_play.setObjectName("primary")
+        self.b_play.setMinimumWidth(84)
+        self.b_play.clicked.connect(self.toggle_play)
+        b_restart = QPushButton("Restart")
+        b_restart.clicked.connect(self.restart_replay)
+        cl.addWidget(self.b_play)
+        cl.addWidget(b_restart)
+        cl.addSpacing(10)
+        cl.addWidget(label("SPEED", "flabel"))
+        self.b_speed, grp = [], QButtonGroup(self)
+        for v in (1, 2, 4):
+            b = QPushButton(f"{v}x")
+            b.setCheckable(True)
+            b.setChecked(v == 1)
+            b.setProperty("value", v)
+            b.clicked.connect(self.set_speed)
+            grp.addButton(b)
+            cl.addWidget(b)
+            self.b_speed.append(b)
+        cl.addSpacing(10)
+        cl.addWidget(label("VIEW", "flabel"))
+        self.b_scope, grp2 = [], QButtonGroup(self)
+        for i, text in enumerate(("All products", "Selected product")):
+            b = QPushButton(text)
+            b.setCheckable(True)
+            b.setChecked(i == 0)
+            b.clicked.connect(self.replay_draw)
+            grp2.addButton(b)
+            cl.addWidget(b)
+            self.b_scope.append(b)
+        lay.addWidget(ctl)
+        self.l_slider = QSlider(Qt.Orientation.Horizontal)
+        self.l_slider.valueChanged.connect(self.seek)
+        lay.addWidget(self.l_slider)
+        self.lk = []
+        lrow = QHBoxLayout()
+        lrow.setSpacing(14)
+        for title in ("This week", "Error so far", "Forecast level so far", "Inside the 80% range so far"):
+            f = QFrame()
+            f.setObjectName("card")
+            l = QVBoxLayout(f)
+            l.setContentsMargins(18, 12, 18, 12)
+            l.setSpacing(2)
+            val, note = label("", "kv"), label("", "kn", True)
+            l.addWidget(label(title, "kl"))
+            l.addWidget(val)
+            l.addWidget(note)
+            lrow.addWidget(f)
+            self.lk.append((val, note))
+        lay.addLayout(lrow)
+        self.l_main, self.l_race = Card("Demand as it arrives", 310), Card("Top sellers so far", 310)
+        self._row(lay, self.l_main, self.l_race, stretch=(3, 2), weight=1)
+        self.l_err, self.l_txt = Card("Running accuracy", 230), Card("What you are watching", text=True)
+        self._row(lay, self.l_err, self.l_txt, stretch=(3, 2), weight=1)
+
+        # ----- accuracy -----
         lay = self._page()
         self.a_h, self.a_seg = Card("By forecast distance", 300), Card("By product group and season", 300)
         self._row(lay, self.a_h, self.a_seg, stretch=(2, 3), weight=1)
@@ -641,6 +493,13 @@ class Window(QMainWindow):
     # ================= state =================
     def go(self, i: int):
         self.stack.setCurrentIndex(i)
+        live = PAGES[i][0] == "Live replay"
+        if live and not self.timer.isActive() and self.rp_k < len(getattr(self, "rp_weeks", [])) - 1:
+            self.timer.start()
+            self.b_play.setText("Pause")
+        elif not live and self.timer.isActive():
+            self.timer.stop()
+            self.b_play.setText("Play")
         self.nav_group.button(i).setChecked(True)
         self.title.setText(PAGES[i][0])
         self.subtitle.setText(PAGES[i][1])
@@ -736,7 +595,7 @@ class Window(QMainWindow):
         self.s_total.chart.lines(t, g.index, [
             dict(name="Actual units", color="actual", values=g["y"].to_numpy()),
             dict(name="Forecast", color="s1", values=g[mdl].to_numpy()),
-            dict(name=BASE_LABEL, color="s2", width=1.6, values=g[BASE].to_numpy())])
+            dict(name=BASE_LABEL, color="s2", width=1.8, values=g[BASE].to_numpy())], area="Actual units")
 
         names = {"gbm_log": "Model: best per-product", "gbm_tweedie": "Model: unbiased totals", "ma13": "13-week average",
                  "ses": "Exponential smoothing", "ma4": "4-week average", "naive": "Last week's sales",
@@ -768,7 +627,7 @@ class Window(QMainWindow):
         self.s_hist.say(f"Demand peaks before Christmas. The busiest week was {tot.idxmax():%d %b %Y} with {tot.max():,.0f} units.",
                         "All 200 products. The shaded area is the final test period that every other chart reports on.")
         self.s_hist.chart.lines(t, tot.index, [dict(name="Units sold per week", color="actual", values=tot.to_numpy())],
-                                shade=(self.final_start, self.final_end, "Final test period"))
+                                shade=(self.final_start, self.final_end, "Final test period"), area="Units sold per week")
 
         # ----- accuracy -----
         hh = fin.groupby("h").apply(lambda d: pd.Series({"m": self.wape(d, mdl), "b": self.wape(d, BASE)}), include_groups=False)
@@ -847,6 +706,7 @@ class Window(QMainWindow):
                                 [self.bias(fin, k_) for k_ in keys], ["s1" if k_ == mdl else "neutral" for k_ in keys],
                                 fmt=lambda v: spct(v, 1), signed=True)
         self.fill_products()
+        self.replay_prepare()
 
     def _fill_ptable(self, ps: pd.DataFrame, t: dict):
         cols = ["Product", "Class", "Sold", "Forecast", "Level", "Model err.", "Simple err.", "Change"]
@@ -877,7 +737,7 @@ class Window(QMainWindow):
         self.sku = self.ptable.item(row, 0).data(Qt.ItemDataRole.UserRole)
         self.search.clear()
         self.fill_products()
-        self.go(3)
+        self.go(4)
 
     def fill_products(self):
         q = self.search.text().strip().lower()
@@ -905,6 +765,7 @@ class Window(QMainWindow):
         if item:
             self.sku = item.data(Qt.ItemDataRole.UserRole)
             self.show_product()
+            self.replay_draw()
 
     def product_table(self) -> pd.DataFrame:
         p = self.preds[self.preds["sku"] == self.sku].sort_values("week")
@@ -972,7 +833,7 @@ class Window(QMainWindow):
                          f"{d['cancellations_matched_to_a_sale']:,} cancelled orders were matched to their original sale and both "
                          f"removed: {d['units_removed_as_cancelled_sales']:,} units that never shipped. Postage and fee lines were dropped last.")
         self.d_clean.chart.hbars(t, [s[0] for s in steps], [float(s[1]) for s in steps],
-                                 ["neutral"] * (len(steps) - 1) + ["s1"], fmt=lambda x: f"{x / 1e6:.3f}M")
+                                 ["neutral"] * (len(steps) - 1) + ["s1"], fmt=lambda x: f"{x:,.0f}")
         folds = self.preds.drop_duplicates("fold").sort_values("fold")
         self.d_time.say(f"{des['folds_total']} forecast dates: {des['folds_selection']} to choose settings, {des['folds_final']} as the final test.",
                         "Each row is one forecast date. Grey = history the model could see. Blue = the 4 weeks it had to forecast. "
@@ -984,6 +845,14 @@ class Window(QMainWindow):
                        "This is why simple averages are hard to beat on this data.")
         self.d_imp.chart.hbars(t, [FEATURE_NAMES.get(k, k) for k in imp.index], list(imp.values), ["s1"] * len(imp),
                                fmt=lambda x: pct(x, 0))
+        self.l_txt.say("A replay of one year, the way a planner would have lived it")
+        self.l_txt.body.setText(
+            "<b>What moves.</b> Each tick is one week. Sales appear as they happened. The forecast line always runs ahead "
+            "of today, because it was made before those weeks.<br><br>"
+            "<b>What to look for.</b> How closely the blue line anticipates the grey one, how the error settles as more "
+            "weeks are checked, and how the best sellers change through the year.<br><br>"
+            "<b>Honest label.</b> This is recorded history from a public data set, played back. Nothing here was fitted "
+            "after the fact: every forecast uses only data from before its week.")
         self.d_txt.say("How the forecast is made and tested")
         self.d_txt.body.setText(
             f"<b>Data.</b> Every transaction of a UK online gift retailer from {d['date_min']} to {d['date_max']} "
@@ -996,6 +865,151 @@ class Window(QMainWindow):
             f"pre-chosen setting. \"Unbiased totals\" aims at the average and is shown so the trade-off is visible.<br><br>"
             f"<b>Limits.</b> Two years of data, one earlier Christmas, no stock levels and no promotion calendar. "
             f"Results will differ on other data.")
+
+    # ================= live replay =================
+    def replay_prepare(self):
+        """Rows for the replay: every forecast week (selection and final), with the current filters."""
+        p = self.preds
+        self.rp_rows = p[p["abc"].isin(self._on(self.b_abc)) & p["demand_type"].isin(self._on(self.b_type))
+                         & p["h"].isin(self._on(self.b_h))]
+        self.rp_weeks = list(pd.DatetimeIndex(sorted(p["week"].unique())))
+        self.week_t = dict(zip(self.cal["week"], self.cal["t"]))
+        self.rp_k = min(self.rp_k, len(self.rp_weeks) - 1)
+        self.l_slider.blockSignals(True)
+        self.l_slider.setRange(0, len(self.rp_weeks) - 1)
+        self.l_slider.setValue(self.rp_k)
+        self.l_slider.blockSignals(False)
+        self.replay_draw()
+
+    def replay_draw(self):
+        if not hasattr(self, "rp_rows"):
+            return
+        t, k, weeks, mdl = THEMES[self.theme], self.rp_k, self.rp_weeks, self.model
+        now, t_now = weeks[k], self.week_t[weeks[k]]
+        one = self.b_scope[1].isChecked() and self.sku is not None
+        rows = self.rp_rows[self.rp_rows["sku"] == self.sku] if one else self.rp_rows
+        if rows.empty:
+            rows, one = self.rp_rows, False
+        name = str(rows["description"].iloc[0]).title() if one else f"{rows['sku'].nunique()} products"
+
+        # ---- main chart: history, actuals up to now, forecasts already issued ----
+        g = rows.groupby("week").agg(y=("y", "sum"), m=(mdl, "sum"), lo=("lo", "sum"), hi=("hi", "sum"),
+                                     cut=("cutoff_t", "max")).reindex(weeks)
+        ph = self.panel[self.panel["sku"].isin(rows["sku"].unique())]
+        ctx = ph[ph["week"] < weeks[0]].groupby("week")["units"].sum().tail(26)
+        seen = np.array([w <= now for w in weeks])
+        issued = (g["cut"] < t_now).to_numpy()
+        pad = [np.nan] * len(ctx)
+        actual = list(ctx.to_numpy(float)) + list(np.where(seen, g["y"], np.nan))
+        fc = pad + list(np.where(issued, g["m"], np.nan))
+        band = (np.array(pad + list(np.where(issued, g["lo"], np.nan)), float),
+                np.array(pad + list(np.where(issued, g["hi"], np.nan)), float)) if one else None
+        top = np.nanmax([ctx.max() if len(ctx) else 0, g["y"].max(), g["m"].max(), g["hi"].max() if one else 0]) * 1.12
+        y_now, m_now = g["y"].get(now, np.nan), g["m"].get(now, np.nan)
+        ahead = int(np.nansum(issued & ~seen))
+        if np.isnan(y_now):
+            self.l_main.say(f"{name}: no forecast for this week with the current filters.")
+        else:
+            self.l_main.say(f"{name}: {y_now:,.0f} units sold this week; the forecast said {m_now:,.0f}.",
+                            f"Grey = sales as they arrive. Blue = forecast, drawn before each week happens "
+                            f"({ahead} week{'s' if ahead != 1 else ''} ahead of today on screen)."
+                            + (" Light blue = 80% range." if one else "") + " Dashed line = today in the replay.")
+        self.l_main.chart.lines(t, list(ctx.index) + weeks, [
+            dict(name="Actual units", color="actual", values=actual),
+            dict(name="Forecast", color="s1", values=fc)], band=band, mark=now, ymax=top, area="Actual units")
+
+        # ---- live tiles ----
+        done = rows[(rows["week"] <= now) & ~rows["closed"]]
+        self.l_week.setText(f"Week of {now:%d %B %Y}")
+        self.l_status.setText(f"Week {k + 1} of {len(weeks)} in the replay. This is recorded history played back, not a live feed: "
+                              f"each forecast shown was made before its week, using only earlier data.")
+        ysum = done["y"].sum()
+        if len(done) and ysum > 0:
+            wm, wb, bs = self.wape(done, mdl), self.wape(done, BASE), self.bias(done, mdl)
+            cov = float(((done["y"] >= done["lo"]) & (done["y"] <= done["hi"])).mean())
+            self.lk[0][0].setText("closed" if np.isnan(y_now) or rows[rows["week"] == now]["closed"].all() else f"{y_now:,.0f}")
+            self.lk[0][1].setText("business shut this week" if np.isnan(y_now) or rows[rows["week"] == now]["closed"].all()
+                                  else f"units sold. Forecast {m_now:,.0f} ({spct(m_now / y_now - 1) if y_now else 'n/a'}).")
+            self.lk[1][0].setText(pct(wm))
+            self.lk[1][0].setStyleSheet(f"color: {t['good'] if wm < wb else t['bad']};")
+            self.lk[1][1].setText(f"{BASE_LABEL}: {pct(wb)}. Model is {'ahead' if wm < wb else 'behind'}.")
+            self.lk[2][0].setText(spct(bs))
+            self.lk[2][0].setStyleSheet(f"color: {t['bad'] if abs(bs) > 0.10 else t['good']};")
+            self.lk[2][1].setText(f"{done[mdl].sum():,.0f} forecast vs {ysum:,.0f} sold.")
+            self.lk[3][0].setText(pct(cov, 0))
+            self.lk[3][1].setText(f"{len(done):,} forecasts checked. Target 80%.")
+        else:
+            for val, note in self.lk:
+                val.setText("0")
+                note.setText("waiting for the first open week")
+
+        # ---- race: cumulative sales by product ----
+        pool = self.rp_rows[self.rp_rows["week"] <= now]
+        cum = pool.groupby("sku")["y"].sum().nlargest(8)
+        names = pool.drop_duplicates("sku").set_index("sku")["description"]
+        labs = [(str(names[s_]).title()[:24] + ("…" if len(str(names[s_])) > 24 else "")) for s_ in cum.index]
+        if len(cum) and cum.max() > 0:
+            self.l_race.say(f"Leader: {str(names[cum.index[0]]).title()} with {cum.iloc[0]:,.0f} units.",
+                            "Units sold since the replay started. The order changes as the weeks go by."
+                            + (" Blue = the selected product." if one else " Blue = the leader."))
+            hi_sku = self.sku if one and self.sku in cum.index else cum.index[0]
+            self.l_race.chart.hbars(t, labs, [float(v) for v in cum.values],
+                                    ["s1" if s_ == hi_sku else "neutral" for s_ in cum.index], fmt=lambda v: f"{v:,.0f}")
+
+        # ---- running accuracy ----
+        ok = rows[~rows["closed"]]
+        c = ok.assign(em=(ok[mdl] - ok["y"]).abs(), eb=(ok[BASE] - ok["y"]).abs()).groupby("week")[["y", "em", "eb"]].sum() \
+              .reindex(weeks).fillna(0).cumsum()
+        with np.errstate(divide="ignore", invalid="ignore"):
+            rm, rb = (c["em"] / c["y"]).to_numpy(), (c["eb"] / c["y"]).to_numpy()
+        full_top = float(np.nanmax(np.concatenate([rm[np.isfinite(rm)], rb[np.isfinite(rb)], [0.5]]))) * 1.15
+        rm, rb = np.where(seen & np.isfinite(rm), rm, np.nan), np.where(seen & np.isfinite(rb), rb, np.nan)
+        if np.isfinite(rm[k]) and np.isfinite(rb[k]):
+            self.l_err.say(f"So far the model's error is {pct(rm[k])}; the {BASE_LABEL} is at {pct(rb[k])}.",
+                           "Error over all weeks replayed so far. Lower is better. Early weeks swing because few forecasts have been checked.")
+        else:
+            self.l_err.say("Waiting for the first open week.", "")
+        self.l_err.chart.lines(t, weeks, [dict(name="Model", color="s1", values=rm),
+                                          dict(name=BASE_LABEL, color="s2", width=1.8, values=rb)],
+                               ymax=min(full_top, 2.0), yfmt=lambda v: f"{100 * v:.0f}%")
+
+    def toggle_play(self):
+        if self.timer.isActive():
+            self.timer.stop()
+            self.b_play.setText("Play")
+        else:
+            if self.rp_k >= len(self.rp_weeks) - 1:
+                self.rp_k = 0
+            self.timer.start()
+            self.b_play.setText("Pause")
+
+    def tick(self):
+        if self.rp_k >= len(self.rp_weeks) - 1:
+            self.timer.stop()
+            self.b_play.setText("Replay")
+            return
+        self.rp_k += 1
+        self.l_slider.blockSignals(True)
+        self.l_slider.setValue(self.rp_k)
+        self.l_slider.blockSignals(False)
+        self.replay_draw()
+
+    def seek(self, value: int):
+        self.rp_k = int(value)
+        self.replay_draw()
+
+    def restart_replay(self):
+        self.rp_k = 0
+        self.l_slider.blockSignals(True)
+        self.l_slider.setValue(0)
+        self.l_slider.blockSignals(False)
+        self.replay_draw()
+        if not self.timer.isActive():
+            self.toggle_play()
+
+    def set_speed(self):
+        v = next(b.property("value") for b in self.b_speed if b.isChecked())
+        self.timer.setInterval(int(800 / v))
 
     # ================= theme =================
     def apply_theme(self):
@@ -1013,24 +1027,37 @@ class Window(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))
+    app.setWindowIcon(logo_icon())
     w = Window()
     if "--screenshot" in sys.argv:           # produce portfolio images without clicking through the app
         out = Path(sys.argv[sys.argv.index("--screenshot") + 1])
+        from catalog import full_page
         w.show()
         app.processEvents()
         for i, (name, _) in enumerate(PAGES):
             w.go(i)
+            if name == "Live replay":
+                w.timer.stop()
+                w.l_slider.setValue(40)
             app.processEvents()
-            w.grab().save(str(out / f"{i + 1}_{name.lower().replace(' ', '_')}.png"))
+            full_page(w).save(str(out / f"{i + 1}_{name.lower().replace(' ', '_')}.png"))
         w.b_model[1].click()
         w.go(0)
         app.processEvents()
-        w.grab().save(str(out / "7_summary_unbiased_totals.png"))
+        full_page(w).save(str(out / "7_summary_unbiased_totals.png"))
         w.b_model[0].click()
         w.toggle_theme()
         w.go(0)
         app.processEvents()
-        w.grab().save(str(out / "8_executive_summary_dark.png"))
+        full_page(w).save(str(out / "8_executive_summary_dark.png"))
+        return
+    if "--catalog" in sys.argv:              # 4:3 images for a portfolio or project catalog
+        from catalog import export
+        out = Path(sys.argv[sys.argv.index("--catalog") + 1])
+        w.show()
+        app.processEvents()
+        export(w, app, out)
+        save_assets(ROOT / "assets")
         return
     w.show()
     sys.exit(app.exec())
