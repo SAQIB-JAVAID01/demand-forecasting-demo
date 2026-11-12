@@ -21,7 +21,6 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 from . import config as C
 from . import macro
@@ -85,6 +84,7 @@ def baseline(panel: pd.DataFrame, cal: pd.DataFrame) -> tuple[pd.DataFrame, pd.D
     tot = panel.groupby("week")["units"].sum().reindex(cal["week"]).fillna(0).to_numpy(float)
     op = ~cal["closed"].to_numpy()
     X = _exog(pd.DatetimeIndex(cal["week"]), cal["trading_days"].to_numpy())
+    from statsmodels.tsa.statespace.sarimax import SARIMAX   # only needed to fit, not to apply scenarios
     res = SARIMAX(np.log1p(tot[op]), exog=X[op], order=(1, 0, 1), trend="ct").fit(disp=False)
     fut = future_calendar(cal)
     Xf = _exog(pd.DatetimeIndex(fut["week"]), fut["trading_days"].to_numpy())
@@ -108,6 +108,7 @@ def macro_estimates(panel: pd.DataFrame, cal: pd.DataFrame) -> dict:
     op = ~cal["closed"].to_numpy()
     X = _exog(pd.DatetimeIndex(cal["week"]), cal["trading_days"].to_numpy())
     M = macro.weekly(cal["week"])[MACRO].to_numpy(float)
+    from statsmodels.tsa.statespace.sarimax import SARIMAX   # only needed to fit, not to apply scenarios
     res = SARIMAX(np.log1p(tot[op]), exog=np.column_stack([X, M])[op], order=(1, 0, 1), trend="ct").fit(disp=False)
     k = X.shape[1] + 2                                   # after intercept and drift
     params, ci = np.asarray(res.params), np.asarray(res.conf_int(0.05))

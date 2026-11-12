@@ -30,12 +30,10 @@ from icons import icon  # noqa: E402
 from live import LivePage  # noqa: E402
 from models_pages import ModelLab, Projection  # noqa: E402
 from src import inventory as INV  # noqa: E402
+from src import kpis as K  # noqa: E402
+from src.kpis import BASE, BASE_LABEL, BIAS_TARGET, SEASONAL  # noqa: E402
 
-BASE = "ma13"                       # strongest simple method on the final test (the tougher comparison)
-BASE_LABEL = "13-week average"
-MODELS = {"gbm_log": "Best per-product accuracy", "gbm_tweedie": "Unbiased totals"}   # ensemble replaces gbm_log
-SEASONAL = "snaive"                 # seasonal naive: same week last year
-BIAS_TARGET = 0.05                  # |bias| within 5% counts as unbiased
+MODELS: dict[str, str] = {}         # forecast settings found in the backtest output, default first (filled on start)
 
 # Design tokens. Same hues in both modes; dark mode lifts lightness and lowers saturation so nothing glows.
 # Neutral surfaces carry 80% of the screen, one accent (blue) marks the model and the selected state,
@@ -265,12 +263,9 @@ class Window(QMainWindow):
         self.panel = pd.read_parquet(C.PROCESSED_DIR / "panel.parquet")
         self.cal = pd.read_parquet(C.PROCESSED_DIR / "calendar.parquet")
         self.m = json.loads((C.REPORTS_DIR / "metrics.json").read_text())
-        if "ensemble" in self.preds.columns:            # chosen on the selection folds in the model lab
-            MODELS.pop("gbm_log", None)
-            MODELS.update({"ensemble": "Best per-product accuracy", "gbm_tweedie": MODELS.pop("gbm_tweedie")})
-            self.model = "ensemble"
-        else:
-            self.model = self.m["chosen_model"]
+        MODELS.clear()
+        MODELS.update(K.settings_for(self.preds))
+        self.model = next(iter(MODELS))                 # opens on "Unbiased totals"; the other setting is one click away
         ipath = C.REPORTS_DIR / "inventory.json"
         self.inv = json.loads(ipath.read_text()) if ipath.exists() else None
         self.themes = THEMES
@@ -278,6 +273,7 @@ class Window(QMainWindow):
         self.final_end = self.preds["week"].max()
         self.sku = None
         self._ci_cache = {}
+        self._head_cache = {}
         self._build()
         self.apply_theme()
 
@@ -369,7 +365,7 @@ class Window(QMainWindow):
         sl.setVerticalSpacing(7)
         sl.addWidget(label("FINAL TEST SNAPSHOT", "navsec"), 0, 0, 1, 2)
         self.snap = []
-        for r_, text in enumerate(("Forecast accuracy", "Value added", "Forecast bias", "Sim. fill rate"), 1):
+        for r_, text in enumerate(("Weekly-total accuracy", "vs benchmark", "Forecast bias", "Sim. fill rate"), 1):
             v = label("", "navval")
             v.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             sl.addWidget(label(text), r_, 0)
@@ -437,10 +433,12 @@ class Window(QMainWindow):
         hl.addWidget(self.hero1)
         hl.addWidget(self.hero2)
         lay.addWidget(hero)
-        self.k = self._kpi_row(lay, ("Forecast accuracy (1–4 wk)", "Forecast Value Added", "Forecast bias",
-                                     "A-item accuracy"))
+        self.k = self._kpi_row(lay, ("Weekly-total accuracy (1–4 wk)", "Value added vs benchmark", "Forecast bias",
+                                     "Product-level accuracy"))
+        self.s_trade = Card("Two forecast settings, one trade-off", text=True)
+        lay.addWidget(self.s_trade)
         self._build_inventory(lay)
-        self.k2 = self._kpi_row(lay, ("Validated on", "Peak season (Nov 2011)", "Weekly-total accuracy",
+        self.k2 = self._kpi_row(lay, ("Validated on", "Peak season (Nov 2011)", "A-item accuracy",
                                       "Inside the 80% interval"), small=True)
         self.s_total, self.s_methods = Card("Forecast vs actual", 290), Card("Forecast Value Added by segment", 290)
         self._row(lay, self.s_total, self.s_methods, stretch=(3, 2), weight=1)
@@ -628,19 +626,10 @@ class Window(QMainWindow):
             return None
         lead = next(b.property("value") for b in self.inv_lead if b.isChecked())
         serv = next(b.property("value") for b in self.inv_serv if b.isChecked())
-        run = next((r for r in self.inv["runs"] if r["model"] == self.model and r["lead"] == lead
-                    and abs(r["service"] - serv) < 1e-9), None)
+        run = K.find_run(self.inv, self.model, lead, serv)
         if run is None:
             return None
-        c, h = self.inv_cost.value() / 100, self.inv_hold.value() / 100
-        m, b, e = run["model_run"], run["base_run"], run["model_same_service"]
-        years = m["weeks"] / 52.0
-        dv = b["avg_inventory_value"] - e["avg_inventory_value"]           # at unit cost = price
-        return dict(run=run, lead=lead, service=serv, cost=c, hold=h, m=m, b=b, e=e,
-                    inv_change=e["avg_inventory_value"] / b["avg_inventory_value"] - 1,
-                    saving=dv * c * h, saving_lo=dv * c * 0.15, saving_hi=dv * c * 0.35,
-                    lost_rev=(b["lost_revenue"] - m["lost_revenue"]) / years,
-                    lost_margin=(b["lost_revenue"] - m["lost_revenue"]) * (1 - c) / years)
+        return K.inventory_view(run, self.inv_cost.value() / 100, self.inv_hold.value() / 100)
 
     def refresh_inventory(self):
         t = THEMES[self.theme]
@@ -763,29 +752,32 @@ class Window(QMainWindow):
 
         # ----- headline (no model names on this page) -----
         acc, acc_b = 1 - wm, 1 - wb
-        fva = wb - wm                                       # Forecast Value Added, accuracy points
-        fva_lo, fva_hi = -hi * wb, -lo * wb                 # 95% range from resampling products
-        fva_s = wb_s = self.wape(fin, SEASONAL)
-        fva_s = wb_s - wm
+        fva = wb - wm                                       # product-level value added, accuracy points
+        fva_s = self.wape(fin, SEASONAL) - wm
+        hk = (tuple(self._on(self.b_abc)), tuple(self._on(self.b_type)), tuple(self._on(self.b_h)))
+        if hk not in self._head_cache:                      # both settings, for the tiles and the trade-off card
+            self._head_cache[hk] = {k_: K.headline(fin, k_) for k_ in MODELS}
+        HALL = self._head_cache[hk]
+        H = HALL[mdl]
+        fva_lo, fva_hi = H["product_ci"]
         weeks_hist = self.cal["week"].nunique()
         n_p = fin["sku"].nunique()
         good = t["good"]
-        if gain:
-            h1 = (f"Out of sample, the forecast is <span style='color:{good}'>{pct(acc)} accurate</span> per product-week, "
-                  f"<span style='color:{good}'>+{100 * fva:.1f} points</span> over the {BASE_LABEL}.")
-        elif loss:
-            h1 = (f"Out of sample, the forecast is {pct(acc)} accurate per product-week, "
-                  f"<span style='color:{t['bad']}'>{100 * fva:.1f} points</span> against the {BASE_LABEL}.")
-        else:
-            h1 = (f"Out of sample, the forecast is {pct(acc)} accurate per product-week, about the same as the "
-                  f"{BASE_LABEL} ({pct(acc_b)}).")
+        pts = lambda x: f"{'+' if x >= 0 else '−'}{abs(100 * x):.1f} pts"
         other = next(k for k in MODELS if k != mdl)
         bo = self.bias(fin, other)
-        if abs(bs) <= BIAS_TARGET:
-            h2 = f"Totals are unbiased ({spct(bs, 1)} against units sold). "
+        vcol = {"better": good, "worse": t["bad"], "level": t["s1"]}
+        vtxt = {"better": "Better than the benchmark", "worse": "Below the benchmark", "level": "Level with the benchmark"}
+        b_ok = abs(bs) <= BIAS_TARGET
+        if b_ok:
+            h1 = (f"Out of sample, weekly totals are <span style='color:{good}'>{pct(H['total_acc'])} accurate</span> and "
+                  f"the forecast level is <span style='color:{good}'>within {abs(100 * bs):.1f}%</span> of the units sold.")
         else:
-            h2 = (f"This setting {'under' if bs < 0 else 'over'}-forecasts totals by {abs(100 * bs):.0f}%; the "
-                  f"\"{MODELS[other]}\" setting is {spct(bo, 1)}. ")
+            h1 = (f"Out of sample, weekly totals are {pct(H['total_acc'])} accurate; this setting runs "
+                  f"<span style='color:{t['warn']}'>{abs(100 * bs):.0f}% {'low' if bs < 0 else 'high'}</span> on totals "
+                  f"because it aims at the typical week, and adds <span style='color:{good}'>{pts(fva)}</span> per product.")
+        h2 = (f"The {BASE_LABEL} benchmark: {pct(H['total_acc_base'])} weekly-total accuracy, {spct(H['bias_base'], 1)} bias. "
+              f"\"{MODELS[other]}\" is one click away at the top. ")
         self.hero1.setText(h1)
         self.hero2.setText(f"{h2}Units, weekly, 1–4 weeks ahead, {n_p} products, rolling backtest "
                            f"{self.final_start:%d %b %Y} to {self.final_end:%d %b %Y}: weeks never used to build or tune the model.")
@@ -804,29 +796,41 @@ class Window(QMainWindow):
         rev = self.panel.groupby("sku")["revenue"].sum()
         a_skus = self.preds.loc[self.preds["abc"] == "A", "sku"].unique()
         a_share = float(rev.reindex(a_skus).sum() / rev.sum())
-        tag = "Unbiased (within ±5%)" if abs(bs) <= BIAS_TARGET else ("Under-forecast" if bs < 0 else "Over-forecast")
-        pts = lambda x: f"{'+' if x >= 0 else '−'}{abs(100 * x):.1f} pts"
+        tag = K.bias_tag(bs)
         inter = ("Accuracy = 1 − WAPE: total absolute error divided by total units, so big sellers count more. "
                  "Single gift products sell in small, irregular amounts with many zero weeks, so product-week error "
                  "is high for every method; the points added over the benchmark are what the forecast contributes.")
+        t_lo, t_hi = H["total_ci"]
+        db = abs(H["bias_base"]) - abs(bs)                  # how much closer to zero than the benchmark's level
         kpis = [
-            (pct(acc), "Out-of-sample · rolling backtest", t["s1"],
-             f"Units, product-week, volume-weighted. Benchmark ({BASE_LABEL}) {pct(acc_b)}.", inter),
-            (pts(fva), f"{pts(fva_s)} vs same week last year", good if fva_s >= 0 else t["bad"],
-             f"vs {BASE_LABEL}. 95% range {pts(fva_lo)} to {pts(fva_hi)}.",
-             "Forecast Value Added = benchmark WAPE − forecast WAPE, in accuracy points, on the same product-weeks. "
-             "The range resamples whole products 1,000 times."),
-            (spct(bs, 1), tag, good if abs(bs) <= BIAS_TARGET else t["warn"],
-             f"Forecast vs actual units, target ±5%. \"{MODELS[other]}\": {spct(bo, 1)}.",
-             "Forecast bias = Σ(forecast − actual) / Σ actual. Below zero = under-forecast."),
+            (pct(H["total_acc"]), "Out-of-sample · rolling backtest", t["s1"],
+             f"All products in the filter added up, week by week: the order-quantity view. "
+             f"Benchmark ({BASE_LABEL}) {pct(H['total_acc_base'])}.",
+             "Weekly-total accuracy = 1 − (Σ |forecast total − actual total| / Σ actual total) over the final-test "
+             "weeks. Product errors that cancel out inside a week do not count, which is what matters for "
+             "purchasing and capacity."),
+            (pts(H["total_fva"]), vtxt[H["total_verdict"]], vcol[H["total_verdict"]],
+             f"Weekly-total accuracy vs {BASE_LABEL}; 95% range {pts(t_lo)} to {pts(t_hi)}. "
+             f"Per product: {pts(fva)} ({vtxt[H['product_verdict']].lower()}).",
+             "Forecast Value Added = benchmark error − forecast error, in accuracy points, on the same weeks. "
+             "\"Level\" means the 95% range includes zero, so the difference could be chance. The total range "
+             "resamples whole weeks, the per-product range resamples whole products, 1,000 times each."),
+            (spct(bs, 1), tag, good if b_ok else t["warn"],
+             f"Forecast vs actual units, target ±5%. Benchmark {spct(H['bias_base'], 1)}"
+             + (f": {pts(db)[:-4]} points closer to zero." if db > 0 else "."),
+             "Forecast bias = Σ(forecast − actual) / Σ actual. Below zero = under-forecast. A setting that aims at "
+             "the typical (median) week is low on totals by design, because occasional bulk orders lift the average "
+             "above the typical week."),
+            (pct(acc), f"{pts(fva)} vs {BASE_LABEL}", vcol[H["product_verdict"]],
+             f"Each product, each week. 95% range {pts(fva_lo)} to {pts(fva_hi)}; {pts(fva_s)} vs same week last year.",
+             inter),
         ]
         if len(fa) and fa["y"].sum() > 0:
             fa_m, fa_b = self.wape(fa, mdl), self.wape(fa, BASE)
-            kpis.append((pct(1 - fa_m), f"{pts(fa_b - fa_m)} vs {BASE_LABEL}", good if fa_b >= fa_m else t["bad"],
-                         f"{fa['sku'].nunique()} class-A products, {pct(a_share, 0)} of revenue.",
-                         "ABC segmentation by first-year revenue. Class A = the top sellers, where accuracy matters most."))
+            a_item = (pct(1 - fa_m), f"{pts(fa_b - fa_m)} vs {BASE_LABEL}", good if fa_b >= fa_m else t["bad"],
+                      f"{fa['sku'].nunique()} class-A products, {pct(a_share, 0)} of revenue, per product-week.")
         else:
-            kpis.append(("–", "Class A not in the filter", t["muted"], "Select class A at the top.", ""))
+            a_item = ("–", "Class A not in the filter", t["muted"], "Select class A at the top.")
         for (val, note, chip), (v_, c_text, c_col, n_, tip) in zip(self.k, kpis):
             val.setText(v_)
             chip.setText(c_text)
@@ -845,8 +849,7 @@ class Window(QMainWindow):
             (f"{n_p} products", "Rolling origin · 13 forecast dates", t["s1"],
              f"{weeks_hist} weeks of history · {len(fin):,} out-of-sample forecasts, 1–4 weeks ahead."),
             peak,
-            (pct(1 - te), f"{pts(dt)} vs {BASE_LABEL}", good if dt >= 0 else (t["warn"] if dt > -0.05 else t["bad"]),
-             "Weekly total of the products in the filter, the order-quantity view."),
+            a_item,
             (pct(cov, 0), "● On the 80% target" if cov_ok else ("↑ Above the 80% target" if cov > 0.8 else "↓ Below the 80% target"),
              good if cov_ok else t["warn"], "Share of actual weeks inside the 80% prediction interval."),
         ]
@@ -855,10 +858,39 @@ class Window(QMainWindow):
             chip.setText(c_text)
             chip.setStyleSheet(chip_css(c_col))
             note.setText(n_)
-        self.snap[0].setText(pct(acc))
-        self.snap[1].setText(pts(fva))
+        self.snap[0].setText(pct(H["total_acc"]))
+        self.snap[1].setText(pts(H["total_fva"]))
         self.snap[2].setText(spct(bs, 1))
         self.refresh_inventory()
+
+        # ----- the two settings side by side -----
+        def cell(text, bold=False, right=True, color=None):
+            style = f"color:{color};" if color else ""
+            return (f"<td align='{'right' if right else 'left'}' style='padding:5px 14px 5px 0;{style}'>"
+                    f"{'<b>' if bold else ''}{text}{'</b>' if bold else ''}</td>")
+        head = "".join(cell(x, True, i > 0) for i, x in enumerate(
+            ("Setting", "Weekly-total accuracy", "Forecast bias", "Product-level accuracy", "Per product vs benchmark")))
+        body = ""
+        for k_ in list(MODELS) + [BASE]:
+            if k_ == BASE:
+                h_ = HALL[mdl]
+                vals_ = (h_["total_acc_base"], h_["bias_base"], h_["product_acc_base"], None)
+                name = f"{BASE_LABEL} (benchmark)"
+            else:
+                h_ = HALL[k_]
+                vals_ = (h_["total_acc"], h_["bias"], h_["product_acc"], h_["product_fva"])
+                name = MODELS[k_] + ("  ·  shown now" if k_ == mdl else "")
+            body += "<tr>" + cell(name, k_ == mdl, False, t["s1"] if k_ == mdl else None) + cell(pct(vals_[0])) + \
+                cell(spct(vals_[1], 1), color=good if abs(vals_[1]) <= BIAS_TARGET else t["warn"]) + cell(pct(vals_[2])) + \
+                cell("–" if vals_[3] is None else f"{pts(vals_[3])} ({vtxt[h_['product_verdict']].split()[0].lower()})",
+                     color=None if vals_[3] is None else vcol[h_["product_verdict"]]) + "</tr>"
+        self.s_trade.say("No setting wins both: one gets the totals right, the other is closer product by product.",
+                         "Both settings come from the same rolling backtest and the same final-test weeks. The benchmark "
+                         "row is the 13-week average. \"Level\" means the 95% range of the difference includes zero.")
+        self.s_trade.body.setText(
+            f"<table cellspacing='0' cellpadding='0'><tr>{head}</tr>{body}</table><br>"
+            + "<br>".join(f"<b>{MODELS[k_]}.</b> {K.SETTING_WHY.get(k_, '')} <i>Use for: "
+                          f"{K.SETTING_USE.get(k_, '').lower()}.</i>" for k_ in MODELS if k_ in K.SETTING_WHY))
 
         # ----- summary charts -----
         self.s_total.say(f"Weekly total: {pct(1 - te, 0)} accurate; the {BASE_LABEL} {pct(1 - tb_, 0)}.",
@@ -895,11 +927,22 @@ class Window(QMainWindow):
                    f"forecast needs {abs(100 * r_inv['inv_change']):.0f}% {'less' if r_inv['inv_change'] < 0 else 'more'} stock "
                    f"for the same fill rate and avoids about £{r_inv['lost_rev']:,.0f} a year of lost sales "
                    f"(simulation, assumptions in the card above)." if r_inv else "Run the inventory simulation to see the effect.")
+        if H["total_verdict"] == "level":
+            t1 = (f"Weekly totals are {pct(H['total_acc'])} accurate, level with the {BASE_LABEL} ({pct(H['total_acc_base'])}; "
+                  f"the 95% range of the difference includes zero).")
+        else:
+            t1 = (f"Weekly totals are {pct(H['total_acc'])} accurate, {pts(H['total_fva'])} "
+                  f"{'over' if H['total_fva'] >= 0 else 'against'} the {BASE_LABEL} ({pct(H['total_acc_base'])}).")
+        t2 = (f"The forecast level is {spct(bs, 1)} against units sold; the benchmark is {spct(H['bias_base'], 1)}."
+              if b_ok else
+              f"This setting is {spct(bs, 1)} on totals because it aims at the typical week, not the average. "
+              f"For total stock use \"{MODELS[other]}\" ({spct(bo, 1)}).")
         self.s_take.body.setText(
-            f"<b>1. Value added.</b> {pts(fva)} of accuracy over the {BASE_LABEL}, and better on {pct(share, 0)} of "
-            f"products. Gift demand is erratic week to week, so the gain over simple methods is the honest measure."
-            f"<br><br><b>2. Level.</b> This setting's totals are {spct(bs)} against actual sales. For total stock, "
-            f"\"{MODELS[other]}\" is {spct(bo)}; use the switch at the top.<br><br>"
+            f"<b>1. Totals.</b> {t1} {t2}<br><br>"
+            f"<b>2. Products.</b> Per product-week this setting is {pct(acc)} accurate ({pts(fva)} vs the benchmark, "
+            f"better on {pct(share, 0)} of products); \"{MODELS[other]}\" is {pct(HALL[other]['product_acc'])} "
+            f"({pts(HALL[other]['product_fva'])}). Single gift products sell in small, irregular amounts, so "
+            f"product-week error is high for every method.<br><br>"
             f"<b>3. Inventory.</b> {inv_txt} The 80% interval held {pct(cov, 0)} of the time.")
 
         tot = self.panel.groupby("week")["units"].sum()
@@ -1142,9 +1185,11 @@ class Window(QMainWindow):
             f"compares them with statistical models and an ensemble. For a forecast made "
             f"h weeks ahead it only uses sales that were known h weeks earlier. Automated tests change the future and "
             f"confirm the inputs do not move.<br><br>"
-            f"<b>Two settings.</b> \"Best per-product accuracy\" had the lowest error on the selection dates and is the "
-            f"pre-chosen setting{' (an ensemble of the three best models there)' if 'ensemble' in MODELS else ''}. "
-            f"\"Unbiased totals\" aims at the average and is shown so the trade-off is visible.<br><br>"
+            f"<b>Two settings.</b> \"Unbiased totals\" aims at the average week, so forecasts add up to the units "
+            f"sold; the app opens on it because totals drive purchasing. \"Best per-product accuracy\" had the lowest "
+            f"product-week error on the selection dates"
+            f"{' (an ensemble of the three best models there)' if 'ensemble' in MODELS else ''}; it aims at the "
+            f"typical week and is low on totals by design. Both were fixed before the final test was scored.<br><br>"
             f"<b>Limits.</b> Two years of data, one earlier Christmas, no stock levels and no promotion calendar. "
             f"Results will differ on other data.")
 
@@ -1282,10 +1327,10 @@ def main():
                 suffix = "" if theme == "dark" else "_light"
                 full_page(w).save(str(out / f"{i + 1}_{name.lower().replace(' ', '_')}{suffix}.png"))
         w.toggle_theme()
-        w.b_model[1].click()
+        w.b_model[1].click()                 # the second setting, for the trade-off screenshot
         w.go(0)
         app.processEvents()
-        full_page(w).save(str(out / "1b_summary_unbiased_totals.png"))
+        full_page(w).save(str(out / "1b_summary_per_product_accuracy.png"))
         w.b_model[0].click()
         w.go(next(i for i, (n_, _) in enumerate(PAGES) if n_ == "Sales projection"))
         w.proj.pick("Recession")

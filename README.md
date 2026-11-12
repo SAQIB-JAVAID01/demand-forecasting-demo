@@ -21,10 +21,12 @@ with an honest backtest against simple methods.
 | `src/scenarios.py` | 26-week sales projection (SARIMAX) with 80% / 95% prediction intervals and what-if economic scenarios |
 | `src/inventory.py` | Replenishment simulation: the same stock policy run with the forecast and with the benchmark |
 | `src/report.py` | Charts and `reports/REPORT.md`, generated from the results |
-| `app/desktop.py` | Demand Forecasting Studio, a PyQt6 desktop app: 9 pages (executive summary, live replay, accuracy, products, product explorer, risk and stock, model lab, sales projection, data and method), charts with a plain-language finding above each, a switch between the two forecast settings, filters, CSV export, dark mode by default (light mode one click away, the choice is remembered), a start-up screen and page fades. Screenshots in `reports/screens/` (dark; `_light` files show light mode) |
+| `app/desktop.py` | Demand Forecasting Studio, a PyQt6 desktop app: 9 pages (executive summary, live replay, accuracy, products, product explorer, risk and stock, model lab, sales projection, data and method), charts with a plain-language finding above each, a switch between the two forecast settings (it opens on "Unbiased totals"), filters, CSV export, dark mode by default (light mode one click away, the choice is remembered), a start-up screen and page fades. Screenshots in `reports/screens/` (dark; `_light` files show light mode) |
+| `src/kpis.py` | The headline numbers (weekly-total accuracy, value added with 95% ranges, bias, product-level accuracy, inventory money), shared by the desktop app and the web app |
+| `web/streamlit_app.py` | Web version of the key pages (Streamlit): executive summary, forecast accuracy, inventory simulation, sales projection, data and method |
 | `app/live.py` | The real-time Live replay page: animated pyqtgraph charts driven by a 30 fps timer (see below) |
 | `app/dashboard.html` | The same view as a single HTML file (built by `src/build_dashboard.py`), no server needed |
-| `tests/` | Tests that change the future and check the model inputs (including the engineered and economic features) do not move, plus checks of the inventory simulation and scenario maths |
+| `tests/` | Tests that change the future and check the model inputs (including the engineered and economic features) do not move, plus checks of the inventory simulation, the scenario maths, the shared KPI code and every page of the web app |
 
 ## Live replay: real-time charts
 
@@ -61,12 +63,25 @@ history, clearly labelled as such, not a live connection; every number is comput
 
 ## Executive summary: the numbers planners use
 
-The first page leads with **forecast accuracy (1 − WAPE, volume-weighted, units, weekly, 1–4 weeks ahead)**, the
-**Forecast Value Added** in accuracy points over the 13-week average and over the same week last year, **forecast
-bias** tagged under / over / unbiased against a ±5% target, and **A-item accuracy** (ABC segmentation). Every tile
-states its grain: 200 products, rolling backtest, out-of-sample weeks only. Raw error tables (WAPE per segment,
-error by horizon) stay on the Forecast accuracy page, where product-week error is explained as noisy for single
-gift products.
+The app opens on the **"Unbiased totals"** setting, because totals drive purchasing and stock. The first page leads
+with **weekly-total accuracy** (all products added up, week by week), the **value added over the 13-week average**
+with its 95% range, **forecast bias** against a ±5% target, and then **product-level accuracy (1 − WAPE)**, which is
+lower for every method because single gift products sell in small, irregular amounts. When a 95% range includes
+zero the tile says "level with the benchmark" instead of claiming a gain.
+
+A card under the tiles puts the two settings side by side, on the same 32 final-test weeks (6,400 product-weeks):
+
+| Setting | Weekly-total accuracy | Forecast bias | Product-level accuracy | Per product vs benchmark |
+|---|---|---|---|---|
+| Unbiased totals (default) | 81.4% | -2.1% | 42.3% | +0.7 pts (level, 95% range −0.8 to +2.1) |
+| Best per-product accuracy | 73.4% | -23.2% | 46.7% | +5.1 pts (better, 95% range +3.7 to +6.8) |
+| 13-week average (benchmark) | 80.7% | -8.8% | 41.6% | – |
+
+No setting wins both. "Unbiased totals" aims at the average week, so the forecasts add up to the units sold; on
+weekly totals it is level with the benchmark (+0.7 pts, 95% range −4.0 to +5.1) and its level is 6.7 points closer
+to zero. "Best per-product accuracy" aims at the typical (median) week; occasional bulk orders lift the average above
+the typical week, so it is closer product by product and low on totals by design. Every tile states its grain:
+200 products, rolling backtest, out-of-sample weeks only.
 
 **Inventory planning (simulated).** The same weekly order-up-to policy, with lost sales, runs once with the forecast
 and once with the 13-week average, for all 200 products over the 32 final-test weeks.
@@ -74,16 +89,18 @@ Safety stock = z × σ × √(L + R), with σ from the last 13 weekly misses. Le
 (90/95/98%), unit cost (share of price) and holding rate are editable in the app. At a 1-week lead time, 95% target,
 unit cost 45% of price and 25% holding rate:
 
-| Same policy | Forecast | 13-week average |
-|---|---|---|
-| Simulated fill rate | 91.0% | 90.2% |
-| Units short (32 weeks) | 84,016 | 91,657 |
-| Weeks of cover | 2.2 | 2.3 |
+| Same policy | Unbiased totals | Best per-product accuracy | 13-week average |
+|---|---|---|---|
+| Simulated fill rate | 91.5% | 91.0% | 90.2% |
+| Units short (32 weeks) | 79,422 | 84,016 | 91,657 |
+| Weeks of cover | 2.5 | 2.2 | 2.3 |
+| Stock needed for the benchmark's fill rate | -2.4% | -11.3% | – |
+| Carrying-cost saving a year (15–35% holding rate) | about £493 (£296 to £690) | about £2,333 (£1,400 to £3,266) | – |
+| Lost sales avoided a year, same service target | about £59,000 | about £29,587 | – |
 
-At the benchmark's fill rate the forecast needs 11% less
-stock: an estimated carrying-cost saving of about £2,333 a year (£1,400 to £3,266 at a 15–35%
-holding rate) and about £29,587 a year of lost sales avoided at the same
-service target. These are simulation results on recorded history with stated assumptions, not measured savings.
+The two settings help in different ways: "Unbiased totals" serves more demand, "Best per-product accuracy" needs
+less stock for the same fill rate. These are simulation results on recorded history with stated assumptions, not
+measured savings.
 
 ## Model lab: statistical models, machine learning and an ensemble
 
@@ -109,8 +126,8 @@ the last 8 dates (6,400 product-weeks) are the out-of-sample test below.
 | Last week's sales | Baseline | 25.7% | 77.8% | +0.5% | +27.2% (+20 to +34) |
 | Same week last year | Baseline | 10.9% | 67.3% | +28.5% | +52.6% (+41 to +64) |
 
-The ensemble has the best per-product accuracy and is the default "Best per-product accuracy" setting; it
-under-forecasts totals, so the "Unbiased totals" setting (LightGBM, Tweedie loss) stays available for total stock.
+The ensemble has the best per-product accuracy and is the "Best per-product accuracy" setting; it under-forecasts
+totals, so the app opens on the "Unbiased totals" setting (LightGBM, Tweedie loss) and shows both side by side.
 The SARIMAX model forecasts the weekly store total and splits it by each product's recent share, because single
 products have too little history for a seasonal model. SHAP values come from LightGBM's built-in TreeSHAP.
 
@@ -174,6 +191,7 @@ Stripe and Vercel):
 | Forecasting | LightGBM, XGBoost, scikit-learn HistGradientBoosting, statsmodels (Holt damped trend, SARIMAX), TSB / Croston, an ensemble, five baseline methods |
 | Statistics | statsmodels (LOWESS trend, scenario regressions), SciPy (robust anomaly scores, service-level z), scikit-learn (error and quantile-loss metrics), TreeSHAP |
 | Inventory | Replenishment simulation (order-up-to, lost sales, safety stock from forecast misses) |
+| Web app | Streamlit, Altair |
 | Desktop app | PyQt6, pyqtgraph (real-time charts), Matplotlib (static charts), Inter typeface |
 | Testing | pytest (leakage tests, simulation and scenario checks) |
 
@@ -194,6 +212,18 @@ python -m pytest tests -q
 python app/desktop.py
 python app/desktop.py --screenshot reports/screens   # regenerate the screenshots
 ```
+
+## Web version
+
+```
+pip install -r web/requirements.txt
+streamlit run web/streamlit_app.py
+```
+
+The web app reads the committed backtest output (`data/processed`, `reports/*.json`) and uses the same KPI code as the
+desktop app (`src/kpis.py`), so the numbers match; nothing is trained in the browser. It needs only Streamlit, pandas,
+NumPy, PyArrow and Altair, so it can be hosted on a free Streamlit host with `web/streamlit_app.py` as the entry
+file. Dark theme by default (`.streamlit/config.toml`). The live replay stays in the desktop app.
 
 ## Data
 
