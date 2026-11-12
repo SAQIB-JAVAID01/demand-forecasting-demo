@@ -49,6 +49,17 @@ def _draw(kind: str, color: str, px: int) -> QPixmap:
         p.drawPolygon(_pts((12, 3), (21, 7.5), (12, 12), (3, 7.5)))
         p.drawPolyline(_pts((3, 12), (12, 16.5), (21, 12)))
         p.drawPolyline(_pts((3, 16.5), (12, 21), (21, 16.5)))
+    elif kind == "lab":
+        p.drawPolyline(_pts((9, 3), (9, 9.5), (4, 19), (5.2, 21), (18.8, 21), (20, 19), (15, 9.5), (15, 3)))
+        p.drawLine(QPointF(7.5, 3), QPointF(16.5, 3))
+        p.drawLine(QPointF(6.4, 15), QPointF(17.6, 15))
+    elif kind == "projection":
+        p.drawPolyline(_pts((3, 18), (8, 13), (11.5, 15.5), (15, 10)))
+        pen2 = QPen(QColor(color), 1.6, Qt.PenStyle.DashLine, Qt.PenCapStyle.RoundCap)
+        p.setPen(pen2)
+        p.drawLine(QPointF(15, 10), QPointF(21, 4.5))
+        p.drawLine(QPointF(15, 10), QPointF(21, 9.5))
+        p.drawLine(QPointF(15, 10), QPointF(21, 14.5))
     elif kind == "moon":
         path = QPainterPath()
         path.addEllipse(QPointF(12, 12), 8.5, 8.5)

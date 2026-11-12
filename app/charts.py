@@ -172,7 +172,7 @@ class Chart(FigureCanvasQTAgg):
         self._done()
 
     # ---------- two bars per category ----------
-    def grouped(self, t, labels, a, b, name_a, name_b):
+    def grouped(self, t, labels, a, b, name_a, name_b, fmt=pct):
         """a = model (blue), b = simple method (orange)."""
         ax = self._base(t, grid="", frame="")
         y = np.arange(len(labels))[::-1]
@@ -180,8 +180,8 @@ class Chart(FigureCanvasQTAgg):
         ax.barh(y + 0.19, a, height=0.32, color=t["s1"], label=name_a, linewidth=0)
         ax.barh(y - 0.19, b, height=0.32, color=t["s2"], label=name_b, linewidth=0)
         for yi, va, vb in zip(y, a, b):
-            ax.text(va + top * 0.015, yi + 0.19, pct(va), va="center", fontsize=8.8, color=t["ink"], fontweight="semibold")
-            ax.text(vb + top * 0.015, yi - 0.19, pct(vb), va="center", fontsize=8.8, color=t["ink2"])
+            ax.text(va + top * 0.015, yi + 0.19, fmt(va), va="center", fontsize=8.8, color=t["ink"], fontweight="semibold")
+            ax.text(vb + top * 0.015, yi - 0.19, fmt(vb), va="center", fontsize=8.8, color=t["ink2"])
         ax.set_yticks(y, labels)
         ax.tick_params(axis="y", labelsize=9.2)
         ax.set_xticks([])
@@ -277,6 +277,49 @@ class Chart(FigureCanvasQTAgg):
         ax.set_yticks([len(folds) - 1, 0], ["First\nforecast", "Last\nforecast"])
         ax.set_ylim(-0.7, len(folds) - 0.3)
         self._legend(ncols=3)
+        self._done()
+
+    # ---------- projection fan ----------
+    def fan(self, t, hx, hy, x, mean, lo80, hi80, lo95, hi95, lines=(), name="Projection"):
+        """History, then a projection with 80% and 95% prediction intervals and optional scenario lines.
+
+        lines: [(label, values, color_key, dashed)]
+        """
+        ax = self._base(t)
+        hx, x = pd.DatetimeIndex(hx), pd.DatetimeIndex(x)
+        hxn = mdates.date2num(hx.to_pydatetime())
+        gradient_fill(ax, hxn, hy, t["actual"], alpha=0.12)
+        ax.plot(hx, hy, color=t["actual"], linewidth=1.8, label="Actual units", zorder=3)
+        jx = pd.DatetimeIndex([hx[-1]]).append(x)                   # join history to the projection
+        j = lambda v: np.concatenate([[hy[-1]], np.asarray(v, float)])
+        ax.fill_between(jx, j(lo95), j(hi95), color=t["s1"], alpha=0.12, linewidth=0, label="95% interval")
+        ax.fill_between(jx, j(lo80), j(hi80), color=t["s1"], alpha=0.24, linewidth=0, label="80% interval")
+        for lab, vals, ck, dashed in lines:
+            ax.plot(jx, j(vals), color=t[ck], linewidth=1.8, linestyle=(0, (4, 3)) if dashed else "-", label=lab, zorder=4)
+        ax.plot(jx, j(mean), color=t["s1"], linewidth=2.6, label=name, zorder=5)
+        ax.plot(jx, j(mean), color=t["s1"], linewidth=8, alpha=0.18, zorder=4)          # soft glow
+        ax.axvline(hx[-1], color=t["muted"], linewidth=1, linestyle=(0, (4, 4)))
+        ax.annotate("Projection →", xy=(hx[-1], 1), xycoords=("data", "axes fraction"), xytext=(6, -14),
+                    textcoords="offset points", fontsize=8.6, color=t["muted"])
+        ax.set_ylim(0, None)
+        ax.set_xlim(hx[0], x[-1])
+        ax.yaxis.set_major_formatter(lambda v, _: units(v))
+        ax.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(5, min_n_ticks=3))
+        ax.xaxis.set_major_locator(mdates.AutoDateLocator(maxticks=8))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
+        self._legend(ncols=5)
+        allx = hx.append(x)
+        nan = np.full(len(hx), np.nan)
+        self._hover = dict(x=allx, xnum=mdates.date2num(allx.to_pydatetime()), yfmt=None, extra=None,
+                           band=(np.concatenate([nan, lo80]), np.concatenate([nan, hi80])),
+                           series=[dict(name="Actual units", values=np.concatenate([hy, np.full(len(x), np.nan)]))]
+                           + [dict(name=lab, values=np.concatenate([nan, vals])) for lab, vals, _, _ in lines]
+                           + [dict(name=name, values=np.concatenate([nan, mean]))],
+                           line=ax.axvline(hx[0], color=t["muted"], linewidth=1, visible=False),
+                           note=ax.annotate("", xy=(0, 0), xytext=(12, -12), textcoords="offset points", va="top",
+                                            fontsize=9, color=t["ink"], visible=False, zorder=10, linespacing=1.6,
+                                            bbox=dict(boxstyle="round,pad=0.7,rounding_size=0.5",
+                                                      fc=t.get("raised", t["surface"]), ec=t["border"], lw=1)))
         self._done()
 
     # ---------- hover ----------

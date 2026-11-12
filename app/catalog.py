@@ -14,12 +14,14 @@ from brand import logo_pixmap
 
 W, H = 1600, 1200
 CAPTIONS = [
-    ("Executive summary", "The answer in one screen: accuracy, level and risk, in plain words"),
+    ("Executive summary", "Forecast accuracy, value added, bias and a simulated inventory plan"),
     ("Live replay", "Real-time replay of real sales: live forecast, KPIs, anomaly feed and sales race"),
     ("Forecast accuracy", "Where the forecast is strong and where it is weak"),
     ("Products", "Every product: forecast against actual sales"),
     ("Product explorer", "History, forecast and 80% range for any product, with CSV export"),
     ("Risk and stock", "How reliable the range is, and how to use it for stock"),
+    ("Model lab", "Every model on the same rolling backtest, with engineered features and SHAP"),
+    ("Sales projection", "26-week projection with prediction intervals under what-if economic scenarios"),
     ("Data and method", "Cleaning steps, test design and what drives the forecast"),
 ]
 

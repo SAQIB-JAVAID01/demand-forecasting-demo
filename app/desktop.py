@@ -16,7 +16,7 @@ from PyQt6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, QSettings, Q
 from PyQt6.QtGui import QColor, QFont, QFontDatabase
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QFileDialog, QFrame, QGraphicsOpacityEffect, QGridLayout,
                              QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
-                             QPushButton, QScrollArea, QSizePolicy, QSplashScreen, QStackedWidget, QTableWidget,
+                             QPushButton, QScrollArea, QSizePolicy, QSlider, QSplashScreen, QStackedWidget, QTableWidget,
                              QTableWidgetItem, QVBoxLayout, QWidget)
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,10 +28,14 @@ from brand import logo_icon, logo_pixmap, save_assets, splash_pixmap  # noqa: E4
 from charts import Chart  # noqa: E402
 from icons import icon  # noqa: E402
 from live import LivePage  # noqa: E402
+from models_pages import ModelLab, Projection  # noqa: E402
+from src import inventory as INV  # noqa: E402
 
 BASE = "ma13"                       # strongest simple method on the final test (the tougher comparison)
 BASE_LABEL = "13-week average"
-MODELS = {"gbm_log": "Best per-product accuracy", "gbm_tweedie": "Unbiased totals"}
+MODELS = {"gbm_log": "Best per-product accuracy", "gbm_tweedie": "Unbiased totals"}   # ensemble replaces gbm_log
+SEASONAL = "snaive"                 # seasonal naive: same week last year
+BIAS_TARGET = 0.05                  # |bias| within 5% counts as unbiased
 
 # Design tokens. Same hues in both modes; dark mode lifts lightness and lowers saturation so nothing glows.
 # Neutral surfaces carry 80% of the screen, one accent (blue) marks the model and the selected state,
@@ -78,6 +82,12 @@ def qss(t: dict) -> str:
     QFrame#hero {{ border: 1px solid {t['border']}; border-radius: 14px;
                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {t['tint']}, stop:1 {t['surface']}); }}
     QFrame#hero QWidget {{ background: transparent; }}
+    QFrame#card QPushButton:checked {{ background: {t['s1']}; color: #ffffff; font-weight: 600; }}
+    QFrame#inner {{ background: {t['raised']}; border: 1px solid {t['border']}; border-radius: 12px; }}
+    QFrame#inner QWidget {{ background: {t['raised']}; }}
+    QLabel#kvs {{ font-size: 21pt; font-weight: 600; }}
+    QDoubleSpinBox {{ background: {t['surface']}; color: {t['ink']}; border: 1px solid {t['border']}; border-radius: 6px;
+                      padding: 3px 6px; }}
     QFrame#hero QComboBox, QFrame#hero QLineEdit {{ background: {t['surface']}; }}
     QFrame#hero QAbstractItemView, QFrame#hero QListView {{ background: {t['raised']}; color: {t['ink']}; }}
     QFrame#hero QPushButton {{ background: {t['surface']}; color: {t['ink']}; border: 1px solid {t['border']}; }}
@@ -216,13 +226,16 @@ class NumItem(QTableWidgetItem):
         return self.value < getattr(other, "value", 0.0)
 
 
-PAGES = [("Executive summary", "The answer in one screen"),
+PAGES = [("Executive summary", "Forecast accuracy, value added and what it means for inventory"),
          ("Live replay", "Real-time replay of a year of real sales, with each forecast drawn before its week"),
          ("Forecast accuracy", "Where the forecast is strong and where it is weak"),
          ("Products", "How every product performed in the final test"),
          ("Product explorer", "History, forecast and range for one product"),
          ("Risk and stock", "How far actual demand can move from the forecast"),
+         ("Model lab", "Statistical models, machine learning and an ensemble on the same rolling backtest"),
+         ("Sales projection", "The next 26 weeks under what-if economic scenarios"),
          ("Data and method", "What went in and how it was tested")]
+ICONS = ("summary", "live", "accuracy", "products", "explorer", "risk", "lab", "projection", "method")
 
 
 def make_table(min_height: int) -> QTableWidget:
@@ -252,7 +265,15 @@ class Window(QMainWindow):
         self.panel = pd.read_parquet(C.PROCESSED_DIR / "panel.parquet")
         self.cal = pd.read_parquet(C.PROCESSED_DIR / "calendar.parquet")
         self.m = json.loads((C.REPORTS_DIR / "metrics.json").read_text())
-        self.model = self.m["chosen_model"]
+        if "ensemble" in self.preds.columns:            # chosen on the selection folds in the model lab
+            MODELS.pop("gbm_log", None)
+            MODELS.update({"ensemble": "Best per-product accuracy", "gbm_tweedie": MODELS.pop("gbm_tweedie")})
+            self.model = "ensemble"
+        else:
+            self.model = self.m["chosen_model"]
+        ipath = C.REPORTS_DIR / "inventory.json"
+        self.inv = json.loads(ipath.read_text()) if ipath.exists() else None
+        self.themes = THEMES
         self.final_start = self.preds.loc[self.preds["fold_type"] == "final", "week"].min()
         self.final_end = self.preds["week"].max()
         self.sku = None
@@ -320,10 +341,10 @@ class Window(QMainWindow):
         n.addLayout(head)
         n.addSpacing(4)
         n.addWidget(label("UK online retailer · 200 products", "navsub"))
-        n.addSpacing(16)
+        n.addSpacing(12)
         self.nav_group = QButtonGroup(self)
         self.nav_buttons = []
-        sections = {0: "OVERVIEW", 2: "ANALYSIS", 6: "METHOD"}
+        sections = {0: "OVERVIEW", 2: "ANALYSIS", 6: "MODELS", 8: "METHOD"}
         for i, (name, _) in enumerate(PAGES):
             if i in sections:
                 if i:
@@ -348,7 +369,7 @@ class Window(QMainWindow):
         sl.setVerticalSpacing(7)
         sl.addWidget(label("FINAL TEST SNAPSHOT", "navsec"), 0, 0, 1, 2)
         self.snap = []
-        for r_, text in enumerate(("Accuracy gain", "Total-demand accuracy", "Products improved", "Inside 80% range"), 1):
+        for r_, text in enumerate(("Forecast accuracy", "Value added", "Forecast bias", "Sim. fill rate"), 1):
             v = label("", "navval")
             v.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             sl.addWidget(label(text), r_, 0)
@@ -416,26 +437,12 @@ class Window(QMainWindow):
         hl.addWidget(self.hero1)
         hl.addWidget(self.hero2)
         lay.addWidget(hero)
-        self.k = []
-        krow = QHBoxLayout()
-        krow.setSpacing(16)
-        for title in ("Accuracy gain vs benchmark", "Total-demand accuracy", "Products improved", "Inside the 80% range"):
-            f = QFrame()
-            f.setObjectName("card")
-            l = QVBoxLayout(f)
-            l.setContentsMargins(20, 16, 20, 16)
-            l.setSpacing(4)
-            val, note, chip = label("", "kv"), label("", "kn", True), label("")
-            l.addWidget(label(title, "kl"))
-            l.addWidget(val)
-            l.addWidget(chip, 0, Qt.AlignmentFlag.AlignLeft)
-            l.addSpacing(2)
-            l.addWidget(note)
-            l.addStretch(1)
-            krow.addWidget(f)
-            self.k.append((val, note, chip))
-        lay.addLayout(krow)
-        self.s_total, self.s_methods = Card("Forecast vs actual", 290), Card("Method comparison", 290)
+        self.k = self._kpi_row(lay, ("Forecast accuracy (1–4 wk)", "Forecast Value Added", "Forecast bias",
+                                     "A-item accuracy"))
+        self._build_inventory(lay)
+        self.k2 = self._kpi_row(lay, ("Validated on", "Peak season (Nov 2011)", "Weekly-total accuracy",
+                                      "Inside the 80% interval"), small=True)
+        self.s_total, self.s_methods = Card("Forecast vs actual", 290), Card("Forecast Value Added by segment", 290)
         self._row(lay, self.s_total, self.s_methods, stretch=(3, 2), weight=1)
         self.s_take, self.s_hist = Card("What this means for the business", text=True), Card("Two years of demand", 240)
         self._row(lay, self.s_take, self.s_hist, stretch=(2, 3), weight=1)
@@ -508,12 +515,181 @@ class Window(QMainWindow):
         self.r_note, self.r_bias = Card("How to use the range", text=True), Card("Forecast level by method", 240)
         self._row(lay, self.r_note, self.r_bias, weight=1)
 
+        # ----- model lab and sales projection -----
+        lay = self._page()
+        self.lab = ModelLab(self, lay, Card, label, chip_css, make_table)
+        lay = self._page()
+        self.proj = Projection(self, lay, Card, label, chip_css)
+
         # ----- 6 method -----
         lay = self._page()
         self.d_clean, self.d_time = Card("Data cleaning", 290), Card("Test design", 290)
         self._row(lay, self.d_clean, self.d_time, weight=1)
         self.d_imp, self.d_txt = Card("What drives the forecast", 300), Card("Method in plain words", text=True)
         self._row(lay, self.d_imp, self.d_txt, weight=1)
+
+    def _kpi_row(self, lay, titles, small=False) -> list:
+        out = []
+        krow = QHBoxLayout()
+        krow.setSpacing(16)
+        for title in titles:
+            f = QFrame()
+            f.setObjectName("card")
+            l = QVBoxLayout(f)
+            l.setContentsMargins(20, 14 if small else 16, 20, 14 if small else 16)
+            l.setSpacing(4)
+            val, note, chip = label("", "kvs" if small else "kv"), label("", "kn", True), label("")
+            l.addWidget(label(title, "kl"))
+            l.addWidget(val)
+            l.addWidget(chip, 0, Qt.AlignmentFlag.AlignLeft)
+            l.addSpacing(2)
+            l.addWidget(note)
+            l.addStretch(1)
+            krow.addWidget(f)
+            out.append((val, note, chip))
+        lay.addLayout(krow)
+        return out
+
+    def _build_inventory(self, lay):
+        """Inventory planning card: one replenishment policy run with the forecast and with the benchmark."""
+        f = QFrame()
+        f.setObjectName("card")
+        v = QVBoxLayout(f)
+        v.setContentsMargins(20, 16, 20, 16)
+        v.setSpacing(10)
+        head = QHBoxLayout()
+        head.addWidget(label("INVENTORY PLANNING · SIMULATED, SAME POLICY MODEL VS BASELINE", "eyebrow"))
+        self.inv_info = label("ⓘ", "info")
+        head.addWidget(self.inv_info)
+        head.addStretch(1)
+        v.addLayout(head)
+        self.inv_find = label("", "h2", True)
+        v.addWidget(self.inv_find)
+        ctl = QHBoxLayout()
+        ctl.setSpacing(6)
+        self.inv_lead, self.inv_serv = [], []
+        for title, opts, store, default in (("LEAD TIME", [(1, "1 wk"), (2, "2 wk"), (3, "3 wk"), (4, "4 wk")], self.inv_lead, 1),
+                                            ("SERVICE TARGET", [(0.90, "90%"), (0.95, "95%"), (0.98, "98%")], self.inv_serv, 0.95)):
+            ctl.addWidget(label(title, "flabel"))
+            grp = QButtonGroup(self)
+            for val, text in opts:
+                b = QPushButton(text)
+                b.setCheckable(True)
+                b.setChecked(val == default)
+                b.setProperty("value", val)
+                b.clicked.connect(self.refresh_inventory)
+                grp.addButton(b)
+                ctl.addWidget(b)
+                store.append(b)
+            ctl.addSpacing(14)
+        self.inv_cost, self.inv_hold = QSlider(Qt.Orientation.Horizontal), QSlider(Qt.Orientation.Horizontal)
+        for title, sl, lo, hi, val in (("UNIT COST, % OF PRICE", self.inv_cost, 30, 60, 45),
+                                       ("HOLDING RATE / YR", self.inv_hold, 15, 35, 25)):
+            ctl.addWidget(label(title, "flabel"))
+            sl.setRange(lo, hi)
+            sl.setValue(val)
+            sl.setFixedWidth(120)
+            sl.valueChanged.connect(self.refresh_inventory)
+            ctl.addWidget(sl)
+            vl = label("", "kn")
+            vl.setMinimumWidth(34)
+            sl.setProperty("lbl", vl)
+            ctl.addWidget(vl)
+            ctl.addSpacing(10)
+        ctl.addStretch(1)
+        v.addLayout(ctl)
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        self.inv_k = []
+        for title in ("Simulated fill rate", "Stock-out risk", "Inventory for the same service",
+                      "Carrying-cost saving", "Lost sales avoided"):
+            fr = QFrame()
+            fr.setObjectName("inner")
+            l = QVBoxLayout(fr)
+            l.setContentsMargins(16, 12, 16, 12)
+            l.setSpacing(3)
+            val, chip, note = label("", "kvs"), label(""), label("", "kn", True)
+            l.addWidget(label(title, "kl"))
+            l.addWidget(val)
+            l.addWidget(chip, 0, Qt.AlignmentFlag.AlignLeft)
+            l.addWidget(note)
+            l.addStretch(1)
+            row.addWidget(fr)
+            self.inv_k.append((val, chip, note))
+        v.addLayout(row)
+        self.inv_foot = label("", "kn", True)
+        self.inv_foot.setTextFormat(Qt.TextFormat.RichText)
+        v.addWidget(self.inv_foot)
+        lay.addWidget(f)
+
+    def inventory_result(self) -> dict | None:
+        """The precomputed simulation for the selected setting, lead time and service target, priced with the inputs."""
+        if self.inv is None:
+            return None
+        lead = next(b.property("value") for b in self.inv_lead if b.isChecked())
+        serv = next(b.property("value") for b in self.inv_serv if b.isChecked())
+        run = next((r for r in self.inv["runs"] if r["model"] == self.model and r["lead"] == lead
+                    and abs(r["service"] - serv) < 1e-9), None)
+        if run is None:
+            return None
+        c, h = self.inv_cost.value() / 100, self.inv_hold.value() / 100
+        m, b, e = run["model_run"], run["base_run"], run["model_same_service"]
+        years = m["weeks"] / 52.0
+        dv = b["avg_inventory_value"] - e["avg_inventory_value"]           # at unit cost = price
+        return dict(run=run, lead=lead, service=serv, cost=c, hold=h, m=m, b=b, e=e,
+                    inv_change=e["avg_inventory_value"] / b["avg_inventory_value"] - 1,
+                    saving=dv * c * h, saving_lo=dv * c * 0.15, saving_hi=dv * c * 0.35,
+                    lost_rev=(b["lost_revenue"] - m["lost_revenue"]) / years,
+                    lost_margin=(b["lost_revenue"] - m["lost_revenue"]) * (1 - c) / years)
+
+    def refresh_inventory(self):
+        t = THEMES[self.theme]
+        for sl in (self.inv_cost, self.inv_hold):
+            sl.property("lbl").setText(f"{sl.value()}%")
+        r = self.inventory_result()
+        if r is None:
+            self.inv_find.setText("Run  python -m src.inventory  to fill this card.")
+            return
+        m, b, e = r["m"], r["b"], r["e"]
+        df = m["fill_rate"] - b["fill_rate"]
+        ds = m["units_short"] - b["units_short"]
+        ic = r["inv_change"]
+        self.inv_find.setText(
+            f"With the same stock policy, the forecast fills {pct(m['fill_rate'])} of demand vs {pct(b['fill_rate'])} "
+            f"with the {BASE_LABEL}, and needs {abs(100 * ic):.0f}% {'less' if ic < 0 else 'more'} stock for the same fill rate.")
+        self.inv_info.setToolTip(
+            "<div style='max-width:360px'>Weekly review, order-up-to policy, lost sales, orders arrive after the lead time. "
+            f"The same policy runs once with the forecast and once with the {BASE_LABEL}, for all "
+            f"{self.inv['products']} products over the {self.inv['weeks_scored']} final-test weeks "
+            f"({self.inv['final_start']} to {self.inv['final_end']}). Money uses the unit cost and holding rate set here; "
+            "both are assumptions. Recorded history, not a live store.</div>")
+        c = r["cost"]
+        vals = [
+            (pct(m["fill_rate"]), f"{'+' if df >= 0 else '−'}{abs(100 * df):.1f} pts vs baseline", t["good"] if df >= 0 else t["bad"],
+             f"Units served from stock. Baseline {pct(b['fill_rate'])}. Target {pct(r['service'], 0)} cycle service."),
+            (f"{m['units_short']:,.0f}", f"{pct(m['share_short'])} of demand short", t["good"] if ds <= 0 else t["warn"],
+             f"Units short over {m['weeks']} weeks; baseline {b['units_short']:,.0f} ({pct(b['share_short'])})."),
+            (f"{100 * ic:+.1f}%", "Same fill rate as the baseline", t["good"] if ic < 0 else t["warn"],
+             f"Average stock £{e['avg_inventory_value'] * c:,.0f} vs £{b['avg_inventory_value'] * c:,.0f} at cost."),
+            (f"£{r['saving']:,.0f}/yr", f"{pct(r['hold'], 0)} holding rate", t["good"] if r["saving"] >= 0 else t["warn"],
+             f"£{r['saving_lo']:,.0f} to £{r['saving_hi']:,.0f} at 15–35% holding; unit cost {pct(c, 0)} of price."),
+            (f"£{r['lost_rev']:,.0f}/yr", f"£{r['lost_margin']:,.0f} margin", t["good"] if r["lost_rev"] >= 0 else t["warn"],
+             "Revenue the baseline missed and the forecast served, same policy and service target."),
+        ]
+        for (val, chip, note), (v_, ct, col, n_) in zip(self.inv_k, vals):
+            val.setText(v_)
+            chip.setText(ct)
+            chip.setStyleSheet(chip_css(col))
+            note.setText(n_)
+        run = r["run"]
+        self.inv_foot.setText(
+            f"<b>Safety stock</b> = z × σ × √(L + R): z = {run['z']:.2f} for {pct(r['service'], 0)}, L = {r['lead']} wk lead "
+            f"time, R = 1 wk review, σ = spread of the last 13 weekly misses. Average safety stock "
+            f"£{m['avg_safety_stock_value'] * c:,.0f} (baseline £{b['avg_safety_stock_value'] * c:,.0f}). "
+            f"<b>Recommended cover</b> {m['weeks_of_cover']:.1f} weeks ({7 * m['weeks_of_cover']:.0f} days) of demand on hand "
+            f"(baseline {b['weeks_of_cover']:.1f}). <b>Reorder point</b> = (L + R) × forecast + safety stock, checked weekly. "
+            f"Same service needs z = {run['z_same_service']:.2f} with the forecast.")
+        self.snap[3].setText(pct(m["fill_rate"]))
 
     # ================= state =================
     def go(self, i: int):
@@ -585,25 +761,34 @@ class Window(QMainWindow):
         cov = float(((fin["y"] >= fin["lo"]) & (fin["y"] <= fin["hi"])).mean())
         gain, loss = hi < 0, lo > 0
 
-        # ----- headline -----
+        # ----- headline (no model names on this page) -----
+        acc, acc_b = 1 - wm, 1 - wb
+        fva = wb - wm                                       # Forecast Value Added, accuracy points
+        fva_lo, fva_hi = -hi * wb, -lo * wb                 # 95% range from resampling products
+        fva_s = wb_s = self.wape(fin, SEASONAL)
+        fva_s = wb_s - wm
+        weeks_hist = self.cal["week"].nunique()
+        n_p = fin["sku"].nunique()
+        good = t["good"]
         if gain:
-            h1 = (f"The forecast is <span style='color:{t['good']}'>{abs(100 * ch):.0f}% more accurate</span> per product "
-                  f"than the best simple method.")
+            h1 = (f"Out of sample, the forecast is <span style='color:{good}'>{pct(acc)} accurate</span> per product-week, "
+                  f"<span style='color:{good}'>+{100 * fva:.1f} points</span> over the {BASE_LABEL}.")
         elif loss:
-            h1 = (f"The forecast is <span style='color:{t['bad']}'>{abs(100 * ch):.0f}% less accurate</span> per product "
-                  f"than the best simple method.")
+            h1 = (f"Out of sample, the forecast is {pct(acc)} accurate per product-week, "
+                  f"<span style='color:{t['bad']}'>{100 * fva:.1f} points</span> against the {BASE_LABEL}.")
         else:
-            h1 = "Per product, the forecast is about as accurate as the best simple method. The difference is not clear."
-        if bs < -0.10:
-            h2 = (f"But it forecasts {abs(100 * bs):.0f}% fewer units than were actually sold. For total stock, switch to "
-                  f"\"Unbiased totals\" above or plan from the upper range.")
-        elif bs > 0.10:
-            h2 = f"But it forecasts {abs(100 * bs):.0f}% more units than were actually sold, so totals run high."
+            h1 = (f"Out of sample, the forecast is {pct(acc)} accurate per product-week, about the same as the "
+                  f"{BASE_LABEL} ({pct(acc_b)}).")
+        other = next(k for k in MODELS if k != mdl)
+        bo = self.bias(fin, other)
+        if abs(bs) <= BIAS_TARGET:
+            h2 = f"Totals are unbiased ({spct(bs, 1)} against units sold). "
         else:
-            h2 = f"Its totals are close to actual sales ({spct(bs, 1)} of units), so it is safe to use for total stock planning."
+            h2 = (f"This setting {'under' if bs < 0 else 'over'}-forecasts totals by {abs(100 * bs):.0f}%; the "
+                  f"\"{MODELS[other]}\" setting is {spct(bo, 1)}. ")
         self.hero1.setText(h1)
-        self.hero2.setText(f"{h2}  Based on {len(fin):,} weekly forecasts for {fin['sku'].nunique()} products, "
-                           f"{self.final_start:%d %b %Y} to {self.final_end:%d %b %Y}: a period never used to build or tune the model.")
+        self.hero2.setText(f"{h2}Units, weekly, 1–4 weeks ahead, {n_p} products, rolling backtest "
+                           f"{self.final_start:%d %b %Y} to {self.final_end:%d %b %Y}: weeks never used to build or tune the model.")
 
         g = fin.groupby("week")[["y", mdl, BASE]].sum()
         te = float((g[mdl] - g["y"]).abs().sum() / g["y"].sum())
@@ -613,37 +798,70 @@ class Window(QMainWindow):
             "wm": self.wape(d, mdl) if d["y"].sum() > 0 else np.nan,
             "wb": self.wape(d, BASE) if d["y"].sum() > 0 else np.nan}), include_groups=False).dropna()
         share = float((ps["wm"] < ps["wb"]).mean())
-        sv_ = [f"{-100 * ch:+.1f}%", pct(1 - te), pct(share, 0), pct(cov, 0)]
         cov_ok = abs(cov - 0.8) <= 0.05
         dt = tb_ - te
-        inter = ("Accuracy = 1 - WAPE. Single gift products sell in small, irregular amounts week to week, so per-product "
-                 "accuracy is low for every method; the gain over the benchmark is what the model adds.")
+        fa = fin[fin["abc"] == "A"]
+        rev = self.panel.groupby("sku")["revenue"].sum()
+        a_skus = self.preds.loc[self.preds["abc"] == "A", "sku"].unique()
+        a_share = float(rev.reindex(a_skus).sum() / rev.sum())
+        tag = "Unbiased (within ±5%)" if abs(bs) <= BIAS_TARGET else ("Under-forecast" if bs < 0 else "Over-forecast")
+        pts = lambda x: f"{'+' if x >= 0 else '−'}{abs(100 * x):.1f} pts"
+        inter = ("Accuracy = 1 − WAPE: total absolute error divided by total units, so big sellers count more. "
+                 "Single gift products sell in small, irregular amounts with many zero weeks, so product-week error "
+                 "is high for every method; the points added over the benchmark are what the forecast contributes.")
         kpis = [
-            (f"{-100 * ch:+.1f}%", "✓ More accurate than the 13-week average" if gain else
-             "✕ Less accurate than the 13-week average" if loss else "≈ Not a clear difference",
-             t["good"] if gain else t["bad"] if loss else t["warn"],
-             f"Per-product accuracy {pct(1 - wm, 0)} vs {pct(1 - wb, 0)}. 95% range of the gain {-100 * hi:+.0f}% to "
-             f"{-100 * lo:+.0f}%.", inter),
-            (pct(1 - te), f"{'↑' if dt >= 0 else '↓'} {abs(100 * dt):.1f} pts vs benchmark",
-             t["good"] if dt >= 0 else (t["warn"] if dt > -0.05 else t["bad"]),
-             f"Weekly total, all products in the filter. Forecast level {spct(bs)} of units sold.",
-             "1 - WAPE of the weekly total: how close the total order quantity would have been. For totals, the "
-             "\"Unbiased totals\" setting is the better choice."),
-            (pct(share, 0), f"{int(round(share * len(ps)))} of {len(ps)} products", t["s1"],
-             "Products where the model's error is below the benchmark's.", ""),
-            (pct(cov, 0), "● On the 80% target" if cov_ok else ("↑ Above the 80% target" if cov > 0.8 else "↓ Below the 80% target"),
-             t["good"] if cov_ok else t["warn"], "Share of actual weeks inside the 80% range.", ""),
+            (pct(acc), "Out-of-sample · rolling backtest", t["s1"],
+             f"Units, product-week, volume-weighted. Benchmark ({BASE_LABEL}) {pct(acc_b)}.", inter),
+            (pts(fva), f"{pts(fva_s)} vs same week last year", good if fva_s >= 0 else t["bad"],
+             f"vs {BASE_LABEL}. 95% range {pts(fva_lo)} to {pts(fva_hi)}.",
+             "Forecast Value Added = benchmark WAPE − forecast WAPE, in accuracy points, on the same product-weeks. "
+             "The range resamples whole products 1,000 times."),
+            (spct(bs, 1), tag, good if abs(bs) <= BIAS_TARGET else t["warn"],
+             f"Forecast vs actual units, target ±5%. \"{MODELS[other]}\": {spct(bo, 1)}.",
+             "Forecast bias = Σ(forecast − actual) / Σ actual. Below zero = under-forecast."),
         ]
+        if len(fa) and fa["y"].sum() > 0:
+            fa_m, fa_b = self.wape(fa, mdl), self.wape(fa, BASE)
+            kpis.append((pct(1 - fa_m), f"{pts(fa_b - fa_m)} vs {BASE_LABEL}", good if fa_b >= fa_m else t["bad"],
+                         f"{fa['sku'].nunique()} class-A products, {pct(a_share, 0)} of revenue.",
+                         "ABC segmentation by first-year revenue. Class A = the top sellers, where accuracy matters most."))
+        else:
+            kpis.append(("–", "Class A not in the filter", t["muted"], "Select class A at the top.", ""))
         for (val, note, chip), (v_, c_text, c_col, n_, tip) in zip(self.k, kpis):
             val.setText(v_)
-            val.setStyleSheet("")
             chip.setText(c_text)
             chip.setStyleSheet(chip_css(c_col))
             note.setToolTip(f"<div style='max-width:320px'>{tip}</div>" if tip else "")
             note.setText(n_)
 
+        fn = fin[fin["week"].dt.month == 11]
+        if len(fn) and fn["y"].sum() > 0:
+            pk_m, pk_b = self.wape(fn, mdl), self.wape(fn, BASE)
+            peak = (pct(1 - pk_m), f"{pts(pk_b - pk_m)} vs {BASE_LABEL}", good if pk_b >= pk_m else t["bad"],
+                    f"{fn['week'].nunique()} weeks of the Christmas run-up. December is after the final test.")
+        else:
+            peak = ("–", "Not in the filter", t["muted"], "")
+        k2 = [
+            (f"{n_p} products", "Rolling origin · 13 forecast dates", t["s1"],
+             f"{weeks_hist} weeks of history · {len(fin):,} out-of-sample forecasts, 1–4 weeks ahead."),
+            peak,
+            (pct(1 - te), f"{pts(dt)} vs {BASE_LABEL}", good if dt >= 0 else (t["warn"] if dt > -0.05 else t["bad"]),
+             "Weekly total of the products in the filter, the order-quantity view."),
+            (pct(cov, 0), "● On the 80% target" if cov_ok else ("↑ Above the 80% target" if cov > 0.8 else "↓ Below the 80% target"),
+             good if cov_ok else t["warn"], "Share of actual weeks inside the 80% prediction interval."),
+        ]
+        for (val, note, chip), (v_, c_text, c_col, n_) in zip(self.k2, k2):
+            val.setText(v_)
+            chip.setText(c_text)
+            chip.setStyleSheet(chip_css(c_col))
+            note.setText(n_)
+        self.snap[0].setText(pct(acc))
+        self.snap[1].setText(pts(fva))
+        self.snap[2].setText(spct(bs, 1))
+        self.refresh_inventory()
+
         # ----- summary charts -----
-        self.s_total.say(f"Total weekly demand: {pct(1 - te, 0)} accurate; the 13-week average {pct(1 - tb_, 0)}.",
+        self.s_total.say(f"Weekly total: {pct(1 - te, 0)} accurate; the {BASE_LABEL} {pct(1 - tb_, 0)}.",
                          "Grey = units actually sold. Blue = forecast made 1 to 4 weeks earlier. Orange = simple method. "
                          "Move the mouse over the chart for values.")
         self.s_total.chart.lines(t, g.index, [
@@ -651,28 +869,38 @@ class Window(QMainWindow):
             dict(name="Forecast", color="s1", values=g[mdl].to_numpy()),
             dict(name=BASE_LABEL, color="s2", width=1.8, values=g[BASE].to_numpy())], area="Actual units")
 
-        names = {"gbm_log": "Model: best per-product", "gbm_tweedie": "Model: unbiased totals", "ma13": "13-week average",
-                 "ses": "Exponential smoothing", "ma4": "4-week average", "naive": "Last week's sales",
-                 "snaive": "Same week last year"}
-        sc = sorted((self.wape(fin, c), c) for c in names)
-        rank = [c for _, c in sc].index(mdl) + 1
-        self.s_methods.say(f"The selected setting ranks {rank} of {len(sc)} methods on per-product error.",
-                           "Shorter bar = smaller error. Blue = the setting selected at the top.")
-        self.s_methods.chart.hbars(t, [names[c] for _, c in sc], [v for v, _ in sc],
-                                   ["s1" if c == mdl else "neutral" for _, c in sc])
+        f2 = fin.assign(season=np.where(fin["week"].dt.month >= 9, "peak", "rest"))
+        segs = []
+        for col_, mapping in (("abc", {"A": "Class A", "B": "Class B", "C": "Class C"}),
+                              ("demand_type", {"regular": "Regular sellers", "intermittent": "Intermittent (Croston-type)"}),
+                              ("season", {"peak": "Sep to Nov (peak)", "rest": "Apr to Aug"}),
+                              ("h", {1: "1 wk ahead", 4: "4 wk ahead"})):
+            for key in mapping:
+                d = f2[f2[col_] == key]
+                if len(d) and d["y"].sum() > 0:
+                    segs.append((mapping[key], self.wape(d, BASE) - self.wape(d, mdl)))
+        best = max(segs, key=lambda v: v[1])
+        neg = [n_ for n_, v in segs if v < 0]
+        self.s_methods.say(f"Largest value added: {best[0]} ({pts(best[1])})." +
+                           (f" Below the benchmark: {', '.join(neg)}." if neg else " Positive in every segment."),
+                           f"Accuracy points added over the {BASE_LABEL} in each segment: benchmark WAPE − forecast WAPE. "
+                           "Green = the forecast adds accuracy, red = it loses accuracy there.")
+        self.s_methods.chart.hbars(t, [n_ for n_, _ in segs], [v for _, v in segs],
+                                   ["good" if v >= 0 else "bad" for _, v in segs],
+                                   fmt=lambda v: f"{'+' if v >= 0 else '−'}{abs(100 * v):.1f}", signed=True)
 
-        for lab_, v_ in zip(self.snap, sv_):
-            lab_.setText(v_)
-        other = "gbm_tweedie" if mdl == "gbm_log" else "gbm_log"
+        r_inv = self.inventory_result()
         self.s_take.say("Three things to take away")
+        inv_txt = (f"With the same policy at a {pct(r_inv['service'], 0)} target and {r_inv['lead']}-week lead time, the "
+                   f"forecast needs {abs(100 * r_inv['inv_change']):.0f}% {'less' if r_inv['inv_change'] < 0 else 'more'} stock "
+                   f"for the same fill rate and avoids about £{r_inv['lost_rev']:,.0f} a year of lost sales "
+                   f"(simulation, assumptions in the card above)." if r_inv else "Run the inventory simulation to see the effect.")
         self.s_take.body.setText(
-            f"<b>1. Accuracy.</b> The forecast beats the {BASE_LABEL} on {pct(share, 0)} of products. Gift demand is erratic "
-            f"week to week, so every method has a large error. The gain over simple methods is the value added.<br><br>"
-            f"<b>2. Level.</b> This setting's total is {spct(bs)} against actual sales. The other setting, "
-            f"\"{MODELS[other]}\", is {spct(self.bias(fin, other))} with a per-product error of {pct(self.wape(fin, other))}. "
-            f"Use the switch at the top to compare.<br><br>"
-            f"<b>3. Risk.</b> The 80% range held {pct(cov, 0)} of the time, so its upper bound is a usable starting point "
-            f"for safety stock.")
+            f"<b>1. Value added.</b> {pts(fva)} of accuracy over the {BASE_LABEL}, and better on {pct(share, 0)} of "
+            f"products. Gift demand is erratic week to week, so the gain over simple methods is the honest measure."
+            f"<br><br><b>2. Level.</b> This setting's totals are {spct(bs)} against actual sales. For total stock, "
+            f"\"{MODELS[other]}\" is {spct(bo)}; use the switch at the top.<br><br>"
+            f"<b>3. Inventory.</b> {inv_txt} The 80% interval held {pct(cov, 0)} of the time.")
 
         tot = self.panel.groupby("week")["units"].sum()
         self.s_hist.say(f"Demand peaks before Christmas. The busiest week was {tot.idxmax():%d %b %Y} with {tot.max():,.0f} units.",
@@ -687,6 +915,13 @@ class Window(QMainWindow):
                          f"{hh['m'].idxmax()} wk ahead ({pct(hh['m'].max())}).", "Blue = model, orange = simple method. Lower is better.")
         else:
             self.a_h.say(f"Error {hh.index[0]} wk ahead is {pct(hh['m'].iloc[0])}.", "Blue = model, orange = simple method.")
+        mae = lambda c: float((fin[c] - fin["y"]).abs().mean())
+        rmse = lambda c: float(np.sqrt(((fin[c] - fin["y"]) ** 2).mean()))
+        self.a_h.how.setText(self.a_h.how.text() + (
+            f" All product-weeks in the filter: WAPE {pct(wm)} vs {pct(wb)}, MAE {mae(mdl):.1f} vs {mae(BASE):.1f} units, "
+            f"RMSE {rmse(mdl):.1f} vs {rmse(BASE):.1f} units (forecast vs {BASE_LABEL}). Product-week error is noisy for "
+            "single gift products with many zero weeks; MAPE is not shown because it is undefined in weeks with no sales."))
+        self.a_h.info.setToolTip(f"<div style='max-width:340px'>{self.a_h.how.text()}</div>")
         self.a_h.chart.grouped(t, [f"{h} wk ahead" for h in hh.index], list(hh["m"]), list(hh["b"]), "Model", BASE_LABEL)
 
         f2 = fin.assign(season=np.where(fin["week"].dt.month >= 9, "peak", "rest"))
@@ -750,13 +985,15 @@ class Window(QMainWindow):
             f"wide, because single gift products sell erratically.<br><br>"
             f"<b>How it was checked.</b> The range was adjusted using mistakes from earlier forecast dates only, then "
             f"tested on later dates. It is the same for both forecast settings.")
-        keys = ["gbm_log", "gbm_tweedie", BASE]
+        keys = list(MODELS) + [BASE]
         self.r_bias.say("For total stock, pick the method whose level is closest to zero.",
                         "Forecast units against actual units for the same weeks. Left of zero = too low.")
-        self.r_bias.chart.hbars(t, ["Model: best per-product", "Model: unbiased totals", BASE_LABEL],
+        self.r_bias.chart.hbars(t, [f"Setting: {MODELS[k_].lower()}" for k_ in MODELS] + [BASE_LABEL],
                                 [self.bias(fin, k_) for k_ in keys], ["s1" if k_ == mdl else "neutral" for k_ in keys],
                                 fmt=lambda v: spct(v, 1), signed=True)
         self.fill_products()
+        self.lab.refresh(t)
+        self.proj.draw()
         self.live.prepare()
 
     def _fill_ptable(self, ps: pd.DataFrame, t: dict):
@@ -901,11 +1138,13 @@ class Window(QMainWindow):
             f"<b>Data.</b> Every transaction of a UK online gift retailer from {d['date_min']} to {d['date_max']} "
             f"(public data, UCI Online Retail II). {d['skus_selected']} products were selected from the first year only; "
             f"they made up {pct(d['selected_share_of_first_year_revenue'], 0)} of first-year revenue.<br><br>"
-            f"<b>Model.</b> One gradient-boosting model (LightGBM) learns from all products at once. For a forecast made "
+            f"<b>Model.</b> Gradient-boosting models (LightGBM) learn from all products at once; the Model lab page "
+            f"compares them with statistical models and an ensemble. For a forecast made "
             f"h weeks ahead it only uses sales that were known h weeks earlier. Automated tests change the future and "
             f"confirm the inputs do not move.<br><br>"
             f"<b>Two settings.</b> \"Best per-product accuracy\" had the lowest error on the selection dates and is the "
-            f"pre-chosen setting. \"Unbiased totals\" aims at the average and is shown so the trade-off is visible.<br><br>"
+            f"pre-chosen setting{' (an ensemble of the three best models there)' if 'ensemble' in MODELS else ''}. "
+            f"\"Unbiased totals\" aims at the average and is shown so the trade-off is visible.<br><br>"
             f"<b>Limits.</b> Two years of data, one earlier Christmas, no stock levels and no promotion calendar. "
             f"Results will differ on other data.")
 
@@ -916,7 +1155,7 @@ class Window(QMainWindow):
         t = THEMES[self.theme]
         self.b_theme.setText("Light mode" if self.theme == "dark" else "Dark mode")
         self.b_theme.setIcon(icon("sun" if self.theme == "dark" else "moon", t["navink"], "#ffffff"))
-        for b, kind in zip(self.nav_buttons, ("summary", "live", "accuracy", "products", "explorer", "risk", "method")):
+        for b, kind in zip(self.nav_buttons, ICONS):
             b.setIcon(icon(kind, t["navink"], "#ffffff"))
         self.render_static()
         self.refresh()
@@ -1048,6 +1287,13 @@ def main():
         app.processEvents()
         full_page(w).save(str(out / "1b_summary_unbiased_totals.png"))
         w.b_model[0].click()
+        w.go(next(i for i, (n_, _) in enumerate(PAGES) if n_ == "Sales projection"))
+        w.proj.pick("Recession")
+        w.proj.draw()
+        app.processEvents()
+        full_page(w).save(str(out / "8b_sales_projection_recession.png"))
+        w.proj.pick("Base")
+        w.proj.draw()
         live_shots(w, app, out)
         return
     if "--demo" in sys.argv:                 # frames for a short screen recording of the live page

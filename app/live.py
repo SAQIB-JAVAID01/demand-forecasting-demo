@@ -620,8 +620,8 @@ class LivePage(QWidget):
         krow = QHBoxLayout()
         krow.setSpacing(16)
         self.tiles = []
-        fmts = [("Units this week", lambda v: f"{v:,.0f}"), ("Accuracy gain vs benchmark", lambda v: f"{100 * v:+.1f}%"),
-                ("Total-demand accuracy", lambda v: f"{100 * v:.1f}%"), ("Inside the 80% range", lambda v: f"{100 * v:.0f}%")]
+        fmts = [("Units this week", lambda v: f"{v:,.0f}"), ("Forecast accuracy so far", lambda v: f"{100 * v:.1f}%"),
+                ("Forecast bias so far", lambda v: f"{100 * v:+.1f}%"), ("Inside the 80% interval", lambda v: f"{100 * v:.0f}%")]
         for title, fmt in fmts:
             f = QFrame()
             f.setObjectName("card")
@@ -1004,22 +1004,20 @@ class LivePage(QWidget):
             bs = sel["m"].sum() / sel["y"].sum() - 1
             cov = float(((sel["y"] >= sel["lo"]) & (sel["y"] <= sel["hi"])).mean())
             ql = (mean_pinball_loss(y, sel["lo"], alpha=0.1) + mean_pinball_loss(y, sel["hi"], alpha=0.9)) / 2
-            gain = 1 - wm / wb if wb > 0 else 0.0
-            self.tiles[1].tk.set(gain)
+            fva = wb - wm                                   # accuracy points added over the benchmark
+            self.tiles[1].tk.set(1 - wm)
             self.tiles[1].tk.set_colors(fg=t["ink"])
-            self.tiles[1].chip.set("✓ Ahead of the benchmark" if gain > 0 else
-                                   "✕ Behind the benchmark", t["good"] if gain > 0 else t["bad"])
-            self.tiles[1].note.setText(f"Per-product accuracy {100 * (1 - wm):.0f}% vs {100 * (1 - wb):.0f}%")
+            self.tiles[1].chip.set(f"{'+' if fva >= 0 else '−'}{abs(100 * fva):.1f} pts vs {self.base_label}",
+                                   t["good"] if fva >= 0 else t["bad"])
+            self.tiles[1].note.setText(f"1 − WAPE · benchmark {100 * (1 - wb):.0f}%")
             self.tiles[1].note.setToolTip(f"<div style='max-width:320px'>{INTER}</div>")
-            ta, tb_ = S.tacc_m[done], S.tacc_b[done]
-            self.tiles[2].tk.set(ta)
+            self.tiles[2].tk.set(bs)
             self.tiles[2].tk.set_colors(fg=t["ink"])
-            d = ta - tb_ if np.isfinite(ta) and np.isfinite(tb_) else 0.0
-            self.tiles[2].chip.set(f"{'↑' if d >= 0 else '↓'} {abs(100 * d):.1f} pts vs benchmark",
-                                   t["good"] if d >= 0 else (t["warn"] if d > -0.05 else t["bad"]))
-            self.tiles[2].note.setText(f"Forecast level {100 * bs:+.0f}% of units sold")
-            self.tiles[2].note.setToolTip("<div style='max-width:320px'>1 - WAPE of the weekly total for the products "
-                                          "in scope: how close the total order quantity would have been.</div>")
+            tag = "Unbiased (within ±5%)" if abs(bs) <= 0.05 else ("Under-forecast" if bs < 0 else "Over-forecast")
+            self.tiles[2].chip.set(tag, t["good"] if abs(bs) <= 0.05 else t["warn"])
+            self.tiles[2].note.setText(f"{sel['m'].sum():,.0f} forecast vs {sel['y'].sum():,.0f} sold")
+            self.tiles[2].note.setToolTip("<div style='max-width:320px'>Forecast bias = (forecast − actual) / actual, "
+                                          "summed over every product-week checked so far. Target ±5%.</div>")
             self.tiles[3].tk.set(cov)
             self.tiles[3].tk.set_colors(fg=t["ink"])
             ok = abs(cov - 0.8) <= 0.05
@@ -1036,7 +1034,7 @@ class LivePage(QWidget):
         for tl in self.tiles[1:]:
             tl.curve.setPen(pg.mkPen(tl.chip.col if tl.chip.text() else QColor(t["s1"]), width=1.8))
         lo_ = max(0, done - 25)
-        for tl, arr, ref in zip(self.tiles, (S.y, S.gain, S.tacc_m, S.cov), (None, 0.0, None, 0.8)):
+        for tl, arr, ref in zip(self.tiles, (S.y, 1 - S.wape_m, S.bias, S.cov), (None, None, 0.0, 0.8)):
             a = arr[lo_:done + 1] if done >= 0 else np.array([])
             tl.curve.setData(np.arange(len(a)), a, connect="finite")
             tl.ref.setVisible(ref is not None and len(a) > 0)
