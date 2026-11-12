@@ -1,0 +1,604 @@
+{
+  "leaderboard": [
+    {
+      "model": "ensemble",
+      "label": "Ensemble (top 3 on selection folds)",
+      "family": "Ensemble",
+      "selection_wape": 0.6241109473910462,
+      "wape": 0.5327566421251652,
+      "bias": -0.23247743142347668,
+      "total_wape": 0.26629752957997704,
+      "class_a_wape": 0.5018295965742389,
+      "vs_ma13": -0.08740361262525664,
+      "vs_ma13_ci95": [
+        -0.11007068950387615,
+        -0.06872609530867424
+      ]
+    },
+    {
+      "model": "gbm_l1",
+      "label": "LightGBM (L1)",
+      "family": "Machine learning",
+      "selection_wape": 0.6462748094123217,
+      "wape": 0.5361693055933464,
+      "bias": -0.20727361174052958,
+      "total_wape": 0.2508112392485395,
+      "class_a_wape": 0.5020088586039729,
+      "vs_ma13": -0.08155782093326625,
+      "vs_ma13_ci95": [
+        -0.1017044617684226,
+        -0.06289667450053552
+      ]
+    },
+    {
+      "model": "gbm_fe",
+      "label": "LightGBM + engineered features",
+      "family": "Machine learning",
+      "selection_wape": 0.6277970221988087,
+      "wape": 0.5367104018418086,
+      "bias": -0.24443358074129018,
+      "total_wape": 0.27332413983194587,
+      "class_a_wape": 0.5043197082793737,
+      "vs_ma13": -0.08063093904663432,
+      "vs_ma13_ci95": [
+        -0.10565698624087685,
+        -0.058351807827475295
+      ]
+    },
+    {
+      "model": "gbm_log",
+      "label": "LightGBM (log target)",
+      "family": "Machine learning",
+      "selection_wape": 0.6297834577777848,
+      "wape": 0.5401084119298547,
+      "bias": -0.24572510178861032,
+      "total_wape": 0.2750377521924286,
+      "class_a_wape": 0.514222060210274,
+      "vs_ma13": -0.07481024816187343,
+      "vs_ma13_ci95": [
+        -0.09714259174005314,
+        -0.05384160420639296
+      ]
+    },
+    {
+      "model": "xgb",
+      "label": "XGBoost (Tweedie)",
+      "family": "Machine learning",
+      "selection_wape": 0.6770773987093467,
+      "wape": 0.5670434797533126,
+      "bias": -0.03401224041675263,
+      "total_wape": 0.18140074659614072,
+      "class_a_wape": 0.5132789848721105,
+      "vs_ma13": -0.028671272791564673,
+      "vs_ma13_ci95": [
+        -0.06220687459885425,
+        0.00271308271910492
+      ]
+    },
+    {
+      "model": "gbm_tweedie",
+      "label": "LightGBM (Tweedie)",
+      "family": "Machine learning",
+      "selection_wape": 0.717845592002232,
+      "wape": 0.5769486145772463,
+      "bias": -0.021349218818164928,
+      "total_wape": 0.18561504570510118,
+      "class_a_wape": 0.5183226265293148,
+      "vs_ma13": -0.011704069490778846,
+      "vs_ma13_ci95": [
+        -0.038384482963416615,
+        0.011028587710953863
+      ]
+    },
+    {
+      "model": "ma13",
+      "label": "13-week average",
+      "family": "Baseline",
+      "selection_wape": 0.844689616100053,
+      "wape": 0.5837812306684017,
+      "bias": -0.08844800505137118,
+      "total_wape": 0.19261385730289673,
+      "class_a_wape": 0.5385776308290138,
+      "vs_ma13": 0.0,
+      "vs_ma13_ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "model": "ses",
+      "label": "Exponential smoothing",
+      "family": "Baseline",
+      "selection_wape": 0.7694137145076285,
+      "wape": 0.5864252676765567,
+      "bias": -0.024420511905665375,
+      "total_wape": 0.17997557076263476,
+      "class_a_wape": 0.5256810820130297,
+      "vs_ma13": 0.004529157275453555,
+      "vs_ma13_ci95": [
+        -0.0328264655935914,
+        0.04180534660358157
+      ]
+    },
+    {
+      "model": "hgb",
+      "label": "HistGradientBoosting (Poisson)",
+      "family": "Machine learning",
+      "selection_wape": 0.727312024717722,
+      "wape": 0.5905815742390321,
+      "bias": 0.016200750152500866,
+      "total_wape": 0.17346196244792061,
+      "class_a_wape": 0.5332215327784029,
+      "vs_ma13": 0.011648787616628908,
+      "vs_ma13_ci95": [
+        -0.018551190614823004,
+        0.042581717530354175
+      ]
+    },
+    {
+      "model": "ets",
+      "label": "Holt damped trend (ETS)",
+      "family": "Statistical",
+      "selection_wape": 0.8392796860507833,
+      "wape": 0.5925826060916723,
+      "bias": -0.013426405933657301,
+      "total_wape": 0.186648629420256,
+      "class_a_wape": 0.5187549157305743,
+      "vs_ma13": 0.0150764960586236,
+      "vs_ma13_ci95": [
+        -0.021278042873013374,
+        0.05070041214833061
+      ]
+    },
+    {
+      "model": "tsb",
+      "label": "TSB / Croston (intermittent)",
+      "family": "Statistical",
+      "selection_wape": 0.835868997314105,
+      "wape": 0.5929039701669452,
+      "bias": -0.05738362807597921,
+      "total_wape": 0.19081204752590308,
+      "class_a_wape": 0.5496685555804812,
+      "vs_ma13": 0.01562698322468914,
+      "vs_ma13_ci95": [
+        0.005429107751193435,
+        0.0270228805749375
+      ]
+    },
+    {
+      "model": "ma4",
+      "label": "4-week average",
+      "family": "Baseline",
+      "selection_wape": 0.7336562390025639,
+      "wape": 0.5973284841712821,
+      "bias": -0.051987386448490186,
+      "total_wape": 0.20203385460034703,
+      "class_a_wape": 0.5464569432148353,
+      "vs_ma13": 0.023206044989438013,
+      "vs_ma13_ci95": [
+        -0.011175816819485122,
+        0.0534187961992903
+      ]
+    },
+    {
+      "model": "sarimax_td",
+      "label": "SARIMAX top-down",
+      "family": "Statistical",
+      "selection_wape": 0.7563189882404829,
+      "wape": 0.6976187731616065,
+      "bias": 0.16871559666227687,
+      "total_wape": 0.2916569590128493,
+      "class_a_wape": 0.6319034876202789,
+      "vs_ma13": 0.19500034689855683,
+      "vs_ma13_ci95": [
+        0.15430722766475685,
+        0.23291192729690643
+      ]
+    },
+    {
+      "model": "naive",
+      "label": "Last week's sales",
+      "family": "Baseline",
+      "selection_wape": 0.8344037504398975,
+      "wape": 0.7426190847117095,
+      "bias": 0.004807976405997346,
+      "total_wape": 0.22198453926693132,
+      "class_a_wape": 0.6690037492350016,
+      "vs_ma13": 0.2720845510251262,
+      "vs_ma13_ci95": [
+        0.20117531552159107,
+        0.3432857363914472
+      ]
+    },
+    {
+      "model": "snaive",
+      "label": "Same week last year",
+      "family": "Baseline",
+      "selection_wape": 0.9083033784123473,
+      "wape": 0.8910517918441678,
+      "bias": 0.28466980751978255,
+      "total_wape": 0.3265034998845011,
+      "class_a_wape": 0.7463770268744689,
+      "vs_ma13": 0.5263453928177102,
+      "vs_ma13_ci95": [
+        0.406314582573106,
+        0.639986898390483
+      ]
+    }
+  ],
+  "ensemble_members": [
+    "gbm_fe",
+    "gbm_log",
+    "gbm_l1"
+  ],
+  "best_on_selection": "ensemble",
+  "feature_importance": [
+    {
+      "feature": "mean_4",
+      "gain": 0.3800643774760135,
+      "shap": 0.16248825537715983,
+      "group": "Rolling statistics"
+    },
+    {
+      "feature": "last",
+      "gain": 0.13152497902434512,
+      "shap": 0.12830470613208728,
+      "group": "Lags and recent sales"
+    },
+    {
+      "feature": "price_last",
+      "gain": 0.05270353279474698,
+      "shap": 0.11523737066460711,
+      "group": "Price and promotion"
+    },
+    {
+      "feature": "orders_mean_4",
+      "gain": 0.0550120651907115,
+      "shap": 0.06566036961658024,
+      "group": "Price and promotion"
+    },
+    {
+      "feature": "ewm_8",
+      "gain": 0.09378537113024392,
+      "shap": 0.0587671853256317,
+      "group": "Rolling statistics"
+    },
+    {
+      "feature": "abc_code",
+      "gain": 0.007985986398745839,
+      "shap": 0.044781836297355826,
+      "group": "Product class"
+    },
+    {
+      "feature": "same_week_last_year",
+      "gain": 0.01463468485357888,
+      "shap": 0.03678419067489579,
+      "group": "Lags and recent sales"
+    },
+    {
+      "feature": "lag_1",
+      "gain": 0.02946216342182924,
+      "shap": 0.03657554247572502,
+      "group": "Lags and recent sales"
+    },
+    {
+      "feature": "price_vs_52",
+      "gain": 0.010018863508478774,
+      "shap": 0.02427883415572523,
+      "group": "Price and promotion"
+    },
+    {
+      "feature": "mean_26",
+      "gain": 0.01253147920770024,
+      "shap": 0.019475923763442905,
+      "group": "Rolling statistics"
+    },
+    {
+      "feature": "mean_8",
+      "gain": 0.02541892910942108,
+      "shap": 0.01863869730999252,
+      "group": "Rolling statistics"
+    },
+    {
+      "feature": "sin_1",
+      "gain": 0.006606700467633135,
+      "shap": 0.01828834974436132,
+      "group": "Seasonality and holidays"
+    },
+    {
+      "feature": "age_weeks",
+      "gain": 0.005529082111693238,
+      "shap": 0.015888790892808882,
+      "group": "Trend"
+    },
+    {
+      "feature": "total_yoy",
+      "gain": 0.002931410571692311,
+      "shap": 0.014596127970215289,
+      "group": "Trend"
+    },
+    {
+      "feature": "trading_days",
+      "gain": 0.006400409228127185,
+      "shap": 0.014518208781506559,
+      "group": "Seasonality and holidays"
+    },
+    {
+      "feature": "price_ratio",
+      "gain": 0.005342730941488714,
+      "shap": 0.013762463174182763,
+      "group": "Price and promotion"
+    },
+    {
+      "feature": "sin_2",
+      "gain": 0.005062742994296236,
+      "shap": 0.012337422297398867,
+      "group": "Seasonality and holidays"
+    },
+    {
+      "feature": "cv2_26",
+      "gain": 0.0104958515187866,
+      "shap": 0.012074695975626932,
+      "group": "Intermittency"
+    },
+    {
+      "feature": "std_8",
+      "gain": 0.0077266250675373125,
+      "shap": 0.011899931596606211,
+      "group": "Rolling statistics"
+    },
+    {
+      "feature": "share_13",
+      "gain": 0.00968792855238778,
+      "shap": 0.011195523533863312,
+      "group": "Store-wide demand"
+    },
+    {
+      "feature": "weekofyear",
+      "gain": 0.011832442452632557,
+      "shap": 0.011066094004536632,
+      "group": "Seasonality and holidays"
+    },
+    {
+      "feature": "total_last",
+      "gain": 0.007455092228017738,
+      "shap": 0.010995124056851224,
+      "group": "Store-wide demand"
+    },
+    {
+      "feature": "total_mean_4",
+      "gain": 0.006886735438130821,
+      "shap": 0.009591947801088758,
+      "group": "Store-wide demand"
+    },
+    {
+      "feature": "mean_13",
+      "gain": 0.008437652441407362,
+      "shap": 0.009390623468533862,
+      "group": "Rolling statistics"
+    },
+    {
+      "feature": "lag_2",
+      "gain": 0.0072866078457811964,
+      "shap": 0.00929737482401148,
+      "group": "Lags and recent sales"
+    },
+    {
+      "feature": "cos_2",
+      "gain": 0.004283089838666039,
+      "shap": 0.008647003754507129,
+      "group": "Seasonality and holidays"
+    },
+    {
+      "feature": "max_13",
+      "gain": 0.00625140189736225,
+      "shap": 0.008194493815724232,
+      "group": "Rolling statistics"
+    },
+    {
+      "feature": "cos_1",
+      "gain": 0.007702209000634334,
+      "shap": 0.007857509988605767,
+      "group": "Seasonality and holidays"
+    },
+    {
+      "feature": "lag_3",
+      "gain": 0.004910564473586317,
+      "shap": 0.007364647455814961,
+      "group": "Lags and recent sales"
+    },
+    {
+      "feature": "intermittent",
+      "gain": 0.00371350782010454,
+      "shap": 0.006856784085655399,
+      "group": "Intermittency"
+    },
+    {
+      "feature": "weeks_since_sale",
+      "gain": 0.0032485166045629482,
+      "shap": 0.0066410859730820695,
+      "group": "Lags and recent sales"
+    },
+    {
+      "feature": "discount_13",
+      "gain": 0.0030596263239262966,
+      "shap": 0.00651956105021037,
+      "group": "Price and promotion"
+    },
+    {
+      "feature": "trend_4_13",
+      "gain": 0.006078947868661112,
+      "shap": 0.006098703461761016,
+      "group": "Trend"
+    },
+    {
+      "feature": "cv_13",
+      "gain": 0.0071166878094180595,
+      "shap": 0.006019975863200432,
+      "group": "Rolling statistics"
+    },
+    {
+      "feature": "macro_inflation",
+      "gain": 0.0023403043095804052,
+      "shap": 0.005740489293232353,
+      "group": "Economy"
+    },
+    {
+      "feature": "cos_3",
+      "gain": 0.0029323582636863704,
+      "shap": 0.005699981153752424,
+      "group": "Seasonality and holidays"
+    },
+    {
+      "feature": "adi_26",
+      "gain": 0.00276325720564258,
+      "shap": 0.005353395557681816,
+      "group": "Intermittency"
+    },
+    {
+      "feature": "slope_13",
+      "gain": 0.008533645046560472,
+      "shap": 0.004978045783726783,
+      "group": "Trend"
+    },
+    {
+      "feature": "macro_confidence",
+      "gain": 0.0024909739501729083,
+      "shap": 0.004944181783420563,
+      "group": "Economy"
+    },
+    {
+      "feature": "weeks_to_xmas",
+      "gain": 0.00808691507555455,
+      "shap": 0.004591323464431692,
+      "group": "Seasonality and holidays"
+    },
+    {
+      "feature": "trading_days_last",
+      "gain": 0.0016277345924016941,
+      "shap": 0.003798440727204185,
+      "group": "Seasonality and holidays"
+    },
+    {
+      "feature": "sin_3",
+      "gain": 0.0026332178559557076,
+      "shap": 0.0033592597059287415,
+      "group": "Seasonality and holidays"
+    },
+    {
+      "feature": "nonzero_8",
+      "gain": 0.00365400580725899,
+      "shap": 0.0031153661456774016,
+      "group": "Rolling statistics"
+    },
+    {
+      "feature": "bank_holidays",
+      "gain": 0.0009530372630125297,
+      "shap": 0.0024885989505768354,
+      "group": "Seasonality and holidays"
+    },
+    {
+      "feature": "macro_unemployment",
+      "gain": 0.0006518474493844477,
+      "shap": 0.0022033959168341138,
+      "group": "Economy"
+    },
+    {
+      "feature": "sb_class",
+      "gain": 0.0006350033108225548,
+      "shap": 0.0018944155179835692,
+      "group": "Intermittency"
+    },
+    {
+      "feature": "bank_holidays_next",
+      "gain": 0.0012203414215114564,
+      "shap": 0.0010661923661371038,
+      "group": "Seasonality and holidays"
+    },
+    {
+      "feature": "month",
+      "gain": 0.00028355526432063244,
+      "shap": 0.0006682938093908401,
+      "group": "Seasonality and holidays"
+    },
+    {
+      "feature": "xmas_peak",
+      "gain": 4.807571785555431e-06,
+      "shap": 3.2644606647919075e-06,
+      "group": "Seasonality and holidays"
+    }
+  ],
+  "feature_groups": {
+    "Lags and recent sales": [
+      "last",
+      "lag_1",
+      "lag_2",
+      "lag_3",
+      "same_week_last_year",
+      "weeks_since_sale"
+    ],
+    "Rolling statistics": [
+      "mean_4",
+      "mean_8",
+      "mean_13",
+      "mean_26",
+      "std_8",
+      "max_13",
+      "nonzero_8",
+      "ewm_8",
+      "cv_13"
+    ],
+    "Trend": [
+      "trend_4_13",
+      "slope_13",
+      "age_weeks",
+      "total_yoy"
+    ],
+    "Intermittency": [
+      "adi_26",
+      "cv2_26",
+      "sb_class",
+      "intermittent"
+    ],
+    "Seasonality and holidays": [
+      "weekofyear",
+      "month",
+      "weeks_to_xmas",
+      "xmas_peak",
+      "trading_days",
+      "trading_days_last",
+      "bank_holidays",
+      "bank_holidays_next",
+      "sin_1",
+      "cos_1",
+      "sin_2",
+      "cos_2",
+      "sin_3",
+      "cos_3"
+    ],
+    "Price and promotion": [
+      "price_last",
+      "price_ratio",
+      "price_vs_52",
+      "discount_13",
+      "orders_mean_4"
+    ],
+    "Store-wide demand": [
+      "total_last",
+      "total_mean_4",
+      "share_13"
+    ],
+    "Product class": [
+      "abc_code"
+    ],
+    "Economy": [
+      "macro_confidence",
+      "macro_unemployment",
+      "macro_inflation"
+    ]
+  },
+  "n_features_base": 27,
+  "n_features_ext": 49,
+  "final_rows": 6400,
+  "runtime_s": 705.4
+}

@@ -1,0 +1,1451 @@
+{
+ "base": "ma13",
+ "products": 200,
+ "weeks_scored": 32,
+ "final_start": "2011-04-25",
+ "final_end": "2011-11-28",
+ "weekly_demand": 29085.78125,
+ "runs": [
+  {
+   "model": "ensemble",
+   "lead": 1,
+   "service": 0.9,
+   "z": 1.2815515655446004,
+   "z_same_service": 1.1510467529296875,
+   "model_run": {
+    "fill_rate": 0.8865932733187892,
+    "units_short": 105552.74382490345,
+    "share_short": 0.1134067266812107,
+    "lost_revenue": 257582.16067905194,
+    "avg_inventory_units": 54559.669920124485,
+    "avg_inventory_value": 145952.98961116507,
+    "avg_safety_stock_value": 86567.22560221182,
+    "weeks_of_cover": 1.8758193032935804,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8768045004360786,
+    "units_short": 114663.59524162211,
+    "share_short": 0.12319549956392149,
+    "lost_revenue": 279839.67584776256,
+    "avg_inventory_units": 57082.00634844141,
+    "avg_inventory_value": 154898.15922893173,
+    "avg_safety_stock_value": 90323.89391973538,
+    "weeks_of_cover": 1.9625399042166494,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8768078226873925,
+    "units_short": 114660.50307282295,
+    "share_short": 0.12319217731260758,
+    "lost_revenue": 278829.04440800473,
+    "avg_inventory_units": 50960.753914966335,
+    "avg_inventory_value": 136474.3305133581,
+    "avg_safety_stock_value": 77751.78667681153,
+    "weeks_of_cover": 1.7520847549854393,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_tweedie",
+   "lead": 1,
+   "service": 0.9,
+   "z": 1.2815515655446004,
+   "z_same_service": 1.0773468017578125,
+   "model_run": {
+    "fill_rate": 0.8919682034427252,
+    "units_short": 100550.05448670061,
+    "share_short": 0.10803179655727467,
+    "lost_revenue": 236050.49136678613,
+    "avg_inventory_units": 60756.489340165725,
+    "avg_inventory_value": 167356.52387620287,
+    "avg_safety_stock_value": 90460.69669760611,
+    "weeks_of_cover": 2.088872525649134,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8768045004360786,
+    "units_short": 114663.59524162211,
+    "share_short": 0.12319549956392149,
+    "lost_revenue": 279839.67584776256,
+    "avg_inventory_units": 57082.00634844141,
+    "avg_inventory_value": 154898.15922893173,
+    "avg_safety_stock_value": 90323.89391973538,
+    "weeks_of_cover": 1.9625399042166494,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8768089965956956,
+    "units_short": 114659.41046353936,
+    "share_short": 0.12319100340430447,
+    "lost_revenue": 268032.5292725822,
+    "avg_inventory_units": 54745.09419127056,
+    "avg_inventory_value": 151139.8379943646,
+    "avg_safety_stock_value": 76046.5243008263,
+    "weeks_of_cover": 1.8821943863471282,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_log",
+   "lead": 1,
+   "service": 0.9,
+   "z": 1.2815515655446004,
+   "z_same_service": 1.1670684814453125,
+   "model_run": {
+    "fill_rate": 0.8854470979729272,
+    "units_short": 106619.54079718782,
+    "share_short": 0.11455290202707274,
+    "lost_revenue": 260285.53173441402,
+    "avg_inventory_units": 54885.71428288665,
+    "avg_inventory_value": 145354.281577398,
+    "avg_safety_stock_value": 87148.37079846255,
+    "weeks_of_cover": 1.8870290542010677,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8768045004360786,
+    "units_short": 114663.59524162211,
+    "share_short": 0.12319549956392149,
+    "lost_revenue": 279839.67584776256,
+    "avg_inventory_units": 57082.00634844141,
+    "avg_inventory_value": 154898.15922893173,
+    "avg_safety_stock_value": 90323.89391973538,
+    "weeks_of_cover": 1.9625399042166494,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8768062573044272,
+    "units_short": 114661.96004519086,
+    "share_short": 0.12319374269557275,
+    "lost_revenue": 279166.01348583144,
+    "avg_inventory_units": 51740.63130260783,
+    "avg_inventory_value": 137139.3598069677,
+    "avg_safety_stock_value": 79363.26520343598,
+    "weeks_of_cover": 1.7788977665025871,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "ensemble",
+   "lead": 1,
+   "service": 0.95,
+   "z": 1.6448536269514722,
+   "z_same_service": 1.504058837890625,
+   "model_run": {
+    "fill_rate": 0.9097322769652445,
+    "units_short": 84016.2318759834,
+    "share_short": 0.09026772303475539,
+    "lost_revenue": 207508.0414061002,
+    "avg_inventory_units": 64879.50069931428,
+    "avg_inventory_value": 173131.90469836319,
+    "avg_safety_stock_value": 111107.83119086988,
+    "weeks_of_cover": 2.230626027943268,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.9015233041539947,
+    "units_short": 91656.69227519011,
+    "share_short": 0.0984766958460052,
+    "lost_revenue": 225715.32999011208,
+    "avg_inventory_units": 67740.65298990108,
+    "avg_inventory_value": 183192.30218040582,
+    "avg_safety_stock_value": 115929.46277672525,
+    "weeks_of_cover": 2.3289954774689465,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.9015256782238986,
+    "units_short": 91654.48262149734,
+    "share_short": 0.09847432177610123,
+    "lost_revenue": 225236.36817072844,
+    "avg_inventory_units": 60823.954650778,
+    "avg_inventory_value": 162458.890002056,
+    "avg_safety_stock_value": 101597.31706413883,
+    "weeks_of_cover": 2.0911920545637055,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_tweedie",
+   "lead": 1,
+   "service": 0.95,
+   "z": 1.6448536269514722,
+   "z_same_service": 1.4223480224609375,
+   "model_run": {
+    "fill_rate": 0.9146682516644403,
+    "units_short": 79422.0981045804,
+    "share_short": 0.08533174833555957,
+    "lost_revenue": 189407.54813896955,
+    "avg_inventory_units": 71873.39892474498,
+    "avg_inventory_value": 197383.9691005731,
+    "avg_safety_stock_value": 116105.04724121939,
+    "weeks_of_cover": 2.471083664797382,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.9015233041539947,
+    "units_short": 91656.69227519011,
+    "share_short": 0.0984766958460052,
+    "lost_revenue": 225715.32999011208,
+    "avg_inventory_units": 67740.65298990108,
+    "avg_inventory_value": 183192.30218040582,
+    "avg_safety_stock_value": 115929.46277672525,
+    "weeks_of_cover": 2.3289954774689465,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.9015281257718903,
+    "units_short": 91652.20457844196,
+    "share_short": 0.0984718742281097,
+    "lost_revenue": 215965.74484918133,
+    "avg_inventory_units": 65001.53254031471,
+    "avg_inventory_value": 178809.00294967578,
+    "avg_safety_stock_value": 100399.07602438249,
+    "weeks_of_cover": 2.2348216120312983,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_log",
+   "lead": 1,
+   "service": 0.95,
+   "z": 1.6448536269514722,
+   "z_same_service": 1.5142059326171875,
+   "model_run": {
+    "fill_rate": 0.9092496745667739,
+    "units_short": 84465.4116453479,
+    "share_short": 0.09075032543322596,
+    "lost_revenue": 209055.12431437656,
+    "avg_inventory_units": 65145.2133121033,
+    "avg_inventory_value": 172189.81540285214,
+    "avg_safety_stock_value": 111853.7229751245,
+    "weeks_of_cover": 2.2397615093149095,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.9015233041539947,
+    "units_short": 91656.69227519011,
+    "share_short": 0.0984766958460052,
+    "lost_revenue": 225715.32999011208,
+    "avg_inventory_units": 67740.65298990108,
+    "avg_inventory_value": 183192.30218040582,
+    "avg_safety_stock_value": 115929.46277672525,
+    "weeks_of_cover": 2.3289954774689465,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.9015250170381323,
+    "units_short": 91655.09801684349,
+    "share_short": 0.09847498296186763,
+    "lost_revenue": 225570.1072600944,
+    "avg_inventory_units": 61389.890572847944,
+    "avg_inventory_value": 162379.5984692891,
+    "avg_safety_stock_value": 102969.38775528493,
+    "weeks_of_cover": 2.1106495316452243,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "ensemble",
+   "lead": 1,
+   "service": 0.98,
+   "z": 2.0537489106318225,
+   "z_same_service": 1.905029296875,
+   "model_run": {
+    "fill_rate": 0.9287422254446225,
+    "units_short": 66322.81737854479,
+    "share_short": 0.07125777455537745,
+    "lost_revenue": 165099.15262823467,
+    "avg_inventory_units": 77144.60808169936,
+    "avg_inventory_value": 205449.16943887228,
+    "avg_safety_stock_value": 138728.20263881487,
+    "weeks_of_cover": 2.6523134248525424,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.9225474932203243,
+    "units_short": 72088.53342264926,
+    "share_short": 0.07745250677967569,
+    "lost_revenue": 179838.18591093237,
+    "avg_inventory_units": 80347.61509765888,
+    "avg_inventory_value": 216783.67396360956,
+    "avg_safety_stock_value": 144748.4469053344,
+    "weeks_of_cover": 2.7624362023165143,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.9225487470802695,
+    "units_short": 72087.36639877447,
+    "share_short": 0.0774512529197304,
+    "lost_revenue": 179208.0072425811,
+    "avg_inventory_units": 72612.86769615952,
+    "avg_inventory_value": 193479.7019838642,
+    "avg_safety_stock_value": 128682.37639062197,
+    "weeks_of_cover": 2.496507385242042,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_tweedie",
+   "lead": 1,
+   "service": 0.98,
+   "z": 2.0537489106318225,
+   "z_same_service": 1.808685302734375,
+   "model_run": {
+    "fill_rate": 0.9327192572102155,
+    "units_short": 62621.214947877816,
+    "share_short": 0.06728074278978433,
+    "lost_revenue": 151489.69994427118,
+    "avg_inventory_units": 85046.14114748551,
+    "avg_inventory_value": 232904.67034184464,
+    "avg_safety_stock_value": 144967.680031474,
+    "weeks_of_cover": 2.923976509913603,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.9225474932203243,
+    "units_short": 72088.53342264926,
+    "share_short": 0.07745250677967569,
+    "lost_revenue": 179838.18591093237,
+    "avg_inventory_units": 80347.61509765888,
+    "avg_inventory_value": 216783.67396360956,
+    "avg_safety_stock_value": 144748.4469053344,
+    "weeks_of_cover": 2.7624362023165143,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.9225502104186989,
+    "units_short": 72086.00440384792,
+    "share_short": 0.07744978958130092,
+    "lost_revenue": 172924.11704173556,
+    "avg_inventory_units": 77074.38562953359,
+    "avg_inventory_value": 211382.4550098382,
+    "avg_safety_stock_value": 127669.41026094677,
+    "weeks_of_cover": 2.6498991024878724,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_log",
+   "lead": 1,
+   "service": 0.98,
+   "z": 2.0537489106318225,
+   "z_same_service": 1.92169189453125,
+   "model_run": {
+    "fill_rate": 0.9278133282926989,
+    "units_short": 67187.38375821193,
+    "share_short": 0.07218667170730106,
+    "lost_revenue": 167443.440407296,
+    "avg_inventory_units": 77390.60200559843,
+    "avg_inventory_value": 204217.64500656168,
+    "avg_safety_stock_value": 139659.51616985616,
+    "weeks_of_cover": 2.660770956791763,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.9225474932203243,
+    "units_short": 72088.53342264926,
+    "share_short": 0.07745250677967569,
+    "lost_revenue": 179838.18591093237,
+    "avg_inventory_units": 80347.61509765888,
+    "avg_inventory_value": 216783.67396360956,
+    "avg_safety_stock_value": 144748.4469053344,
+    "weeks_of_cover": 2.7624362023165143,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.9225504134488112,
+    "units_short": 72085.81543458624,
+    "share_short": 0.07744958655118882,
+    "lost_revenue": 179599.9235230008,
+    "avg_inventory_units": 73370.64591574589,
+    "avg_inventory_value": 193675.48161732143,
+    "avg_safety_stock_value": 130679.34391999381,
+    "weeks_of_cover": 2.5225606039289694,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "ensemble",
+   "lead": 2,
+   "service": 0.9,
+   "z": 1.2815515655446004,
+   "z_same_service": 1.0970001220703125,
+   "model_run": {
+    "fill_rate": 0.8841160321667412,
+    "units_short": 107858.42364096653,
+    "share_short": 0.11588396783325887,
+    "lost_revenue": 257946.32169825712,
+    "avg_inventory_units": 80006.32775811647,
+    "avg_inventory_value": 224771.25280580754,
+    "avg_safety_stock_value": 106022.76558690757,
+    "weeks_of_cover": 2.750702381704685,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8707398687945719,
+    "units_short": 120308.22081879598,
+    "share_short": 0.1292601312054279,
+    "lost_revenue": 283301.0499339647,
+    "avg_inventory_units": 82080.87021786804,
+    "avg_inventory_value": 234260.63343630795,
+    "avg_safety_stock_value": 110623.72584231378,
+    "weeks_of_cover": 2.8220273511775806,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8707435326398663,
+    "units_short": 120304.81071310777,
+    "share_short": 0.12925646736013385,
+    "lost_revenue": 285322.2159029304,
+    "avg_inventory_units": 73914.72845553522,
+    "avg_inventory_value": 208915.30974053073,
+    "avg_safety_stock_value": 90754.82401025714,
+    "weeks_of_cover": 2.5412667385558096,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_tweedie",
+   "lead": 2,
+   "service": 0.9,
+   "z": 1.2815515655446004,
+   "z_same_service": 1.0324859619140625,
+   "model_run": {
+    "fill_rate": 0.8890228998473929,
+    "units_short": 103291.38108153826,
+    "share_short": 0.11097710015260706,
+    "lost_revenue": 237323.18298612608,
+    "avg_inventory_units": 90441.14080724354,
+    "avg_inventory_value": 260566.7457367043,
+    "avg_safety_stock_value": 110791.27434290314,
+    "weeks_of_cover": 3.109462318714356,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8707398687945719,
+    "units_short": 120308.22081879598,
+    "share_short": 0.1292601312054279,
+    "lost_revenue": 283301.0499339647,
+    "avg_inventory_units": 82080.87021786804,
+    "avg_inventory_value": 234260.63343630795,
+    "avg_safety_stock_value": 110623.72584231378,
+    "weeks_of_cover": 2.8220273511775806,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8707426371159056,
+    "units_short": 120305.64421755637,
+    "share_short": 0.1292573628840943,
+    "lost_revenue": 272188.9895714998,
+    "avg_inventory_units": 81622.39314763635,
+    "avg_inventory_value": 236599.507693543,
+    "avg_safety_stock_value": 89259.33106172473,
+    "weeks_of_cover": 2.8062644233644694,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_log",
+   "lead": 2,
+   "service": 0.9,
+   "z": 1.2815515655446004,
+   "z_same_service": 1.121673583984375,
+   "model_run": {
+    "fill_rate": 0.8824879523951966,
+    "units_short": 109373.75074793248,
+    "share_short": 0.11751204760480312,
+    "lost_revenue": 261968.374801458,
+    "avg_inventory_units": 80605.42544886294,
+    "avg_inventory_value": 223795.7549442997,
+    "avg_safety_stock_value": 106734.52018554951,
+    "weeks_of_cover": 2.7712999955558333,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8707398687945719,
+    "units_short": 120308.22081879598,
+    "share_short": 0.1292601312054279,
+    "lost_revenue": 283301.0499339647,
+    "avg_inventory_units": 82080.87021786804,
+    "avg_inventory_value": 234260.63343630795,
+    "avg_safety_stock_value": 110623.72584231378,
+    "weeks_of_cover": 2.8220273511775806,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8707421779308883,
+    "units_short": 120306.07160171526,
+    "share_short": 0.12925782206911157,
+    "lost_revenue": 286666.6005322017,
+    "avg_inventory_units": 75350.58670554636,
+    "avg_inventory_value": 210162.5595467584,
+    "avg_safety_stock_value": 93419.02035795328,
+    "weeks_of_cover": 2.590633067679637,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "ensemble",
+   "lead": 2,
+   "service": 0.95,
+   "z": 1.6448536269514722,
+   "z_same_service": 1.4490509033203125,
+   "model_run": {
+    "fill_rate": 0.904394568907263,
+    "units_short": 88984.27696240958,
+    "share_short": 0.09560543109273709,
+    "lost_revenue": 215486.14783155915,
+    "avg_inventory_units": 92596.82282824723,
+    "avg_inventory_value": 257246.853391283,
+    "avg_safety_stock_value": 136078.7464224603,
+    "weeks_of_cover": 3.1835769523380852,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8941800292846263,
+    "units_short": 98491.40864348033,
+    "share_short": 0.10581997071537352,
+    "lost_revenue": 237604.91440639866,
+    "avg_inventory_units": 94833.32554117858,
+    "avg_inventory_value": 267265.7780813632,
+    "avg_safety_stock_value": 141984.01497897634,
+    "weeks_of_cover": 3.2604702870471662,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8941851770169138,
+    "units_short": 98486.6174173924,
+    "share_short": 0.10581482298308602,
+    "lost_revenue": 236495.34210658562,
+    "avg_inventory_units": 85729.87485169001,
+    "avg_inventory_value": 239515.39098919678,
+    "avg_safety_stock_value": 119879.98639831514,
+    "weeks_of_cover": 2.947483999649829,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_tweedie",
+   "lead": 2,
+   "service": 0.95,
+   "z": 1.6448536269514722,
+   "z_same_service": 1.36712646484375,
+   "model_run": {
+    "fill_rate": 0.9082148401622175,
+    "units_short": 85428.5785932167,
+    "share_short": 0.09178515983778232,
+    "lost_revenue": 200097.0406926154,
+    "avg_inventory_units": 104101.29258137415,
+    "avg_inventory_value": 297042.6484254326,
+    "avg_safety_stock_value": 142199.06115136162,
+    "weeks_of_cover": 3.579112821023989,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8941800292846263,
+    "units_short": 98491.40864348033,
+    "share_short": 0.10581997071537352,
+    "lost_revenue": 237604.91440639866,
+    "avg_inventory_units": 94833.32554117858,
+    "avg_inventory_value": 267265.7780813632,
+    "avg_safety_stock_value": 141984.01497897634,
+    "weeks_of_cover": 3.2604702870471662,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8941827638023346,
+    "units_short": 98488.86350479575,
+    "share_short": 0.10581723619766505,
+    "lost_revenue": 227388.50893462187,
+    "avg_inventory_units": 93593.29463267027,
+    "avg_inventory_value": 269028.7748529504,
+    "avg_safety_stock_value": 118189.30061045283,
+    "weeks_of_cover": 3.2178367095664746,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_log",
+   "lead": 2,
+   "service": 0.95,
+   "z": 1.6448536269514722,
+   "z_same_service": 1.4644317626953125,
+   "model_run": {
+    "fill_rate": 0.9038244729343616,
+    "units_short": 89514.89093870753,
+    "share_short": 0.09617552706563831,
+    "lost_revenue": 216821.51108972085,
+    "avg_inventory_units": 93112.51435672422,
+    "avg_inventory_value": 255955.73607548155,
+    "avg_safety_stock_value": 136992.2735598393,
+    "weeks_of_cover": 3.2013069738920703,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8941800292846263,
+    "units_short": 98491.40864348033,
+    "share_short": 0.10581997071537352,
+    "lost_revenue": 237604.91440639866,
+    "avg_inventory_units": 94833.32554117858,
+    "avg_inventory_value": 267265.7780813632,
+    "avg_safety_stock_value": 141984.01497897634,
+    "weeks_of_cover": 3.2604702870471662,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8941805627762798,
+    "units_short": 98490.91209879148,
+    "share_short": 0.10581943722372023,
+    "lost_revenue": 237263.19477109401,
+    "avg_inventory_units": 86802.53509601518,
+    "avg_inventory_value": 239750.87460412,
+    "avg_safety_stock_value": 121965.76847794658,
+    "weeks_of_cover": 2.984363196227201,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "ensemble",
+   "lead": 2,
+   "service": 0.98,
+   "z": 2.0537489106318225,
+   "z_same_service": 1.824493408203125,
+   "model_run": {
+    "fill_rate": 0.9224469294785879,
+    "units_short": 72182.13262245145,
+    "share_short": 0.07755307052141182,
+    "lost_revenue": 178796.69849332338,
+    "avg_inventory_units": 107292.04971852127,
+    "avg_inventory_value": 295216.15098073427,
+    "avg_safety_stock_value": 169906.65469926165,
+    "weeks_of_cover": 3.6888144346654355,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.9129796810960972,
+    "units_short": 80993.72671821313,
+    "share_short": 0.08702031890390292,
+    "lost_revenue": 198799.93991986706,
+    "avg_inventory_units": 109974.72873875254,
+    "avg_inventory_value": 306021.4886465299,
+    "avg_safety_stock_value": 177279.91798920603,
+    "weeks_of_cover": 3.781047783915123,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.9129799789063838,
+    "units_short": 80993.44953277764,
+    "share_short": 0.08702002109361602,
+    "lost_revenue": 198137.7821106392,
+    "avg_inventory_units": 98989.8782159145,
+    "avg_inventory_value": 273786.2107929411,
+    "avg_safety_stock_value": 150940.34616591947,
+    "weeks_of_cover": 3.4033769753361707,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_tweedie",
+   "lead": 2,
+   "service": 0.98,
+   "z": 2.0537489106318225,
+   "z_same_service": 1.7532501220703125,
+   "model_run": {
+    "fill_rate": 0.9244245178935533,
+    "units_short": 70341.50209316453,
+    "share_short": 0.07557548210644648,
+    "lost_revenue": 167354.91440972706,
+    "avg_inventory_units": 120182.42572437465,
+    "avg_inventory_value": 340110.82064494904,
+    "avg_safety_stock_value": 177548.4226360847,
+    "weeks_of_cover": 4.131999229842749,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.9129796810960972,
+    "units_short": 80993.72671821313,
+    "share_short": 0.08702031890390292,
+    "lost_revenue": 198799.93991986706,
+    "avg_inventory_units": 109974.72873875254,
+    "avg_inventory_value": 306021.4886465299,
+    "avg_safety_stock_value": 177279.91798920603,
+    "weeks_of_cover": 3.781047783915123,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.912980586282997,
+    "units_short": 80992.88422003183,
+    "share_short": 0.08701941371700286,
+    "lost_revenue": 190550.44195486978,
+    "avg_inventory_units": 108282.25917895263,
+    "avg_inventory_value": 308116.8041024628,
+    "avg_safety_stock_value": 151570.0347051391,
+    "weeks_of_cover": 3.7228588858672187,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_log",
+   "lead": 2,
+   "service": 0.98,
+   "z": 2.0537489106318225,
+   "z_same_service": 1.83966064453125,
+   "model_run": {
+    "fill_rate": 0.9218168742123501,
+    "units_short": 72768.55341122612,
+    "share_short": 0.07818312578764981,
+    "lost_revenue": 180095.2894388657,
+    "avg_inventory_units": 107933.08923239037,
+    "avg_inventory_value": 294439.17479082826,
+    "avg_safety_stock_value": 171047.27617006202,
+    "weeks_of_cover": 3.7108540528678553,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.9129796810960972,
+    "units_short": 80993.72671821313,
+    "share_short": 0.08702031890390292,
+    "lost_revenue": 198799.93991986706,
+    "avg_inventory_units": 109974.72873875254,
+    "avg_inventory_value": 306021.4886465299,
+    "avg_safety_stock_value": 177279.91798920603,
+    "weeks_of_cover": 3.781047783915123,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.912982145977726,
+    "units_short": 80991.43254196146,
+    "share_short": 0.08701785402227405,
+    "lost_revenue": 198190.82080329958,
+    "avg_inventory_units": 100072.637069794,
+    "avg_inventory_value": 273903.0284827905,
+    "avg_safety_stock_value": 153216.8517267893,
+    "weeks_of_cover": 3.4406033728179124,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "ensemble",
+   "lead": 3,
+   "service": 0.9,
+   "z": 1.2815515655446004,
+   "z_same_service": 1.085357666015625,
+   "model_run": {
+    "fill_rate": 0.878588758276962,
+    "units_short": 113002.90617750898,
+    "share_short": 0.12141124172303798,
+    "lost_revenue": 271020.9776146052,
+    "avg_inventory_units": 107357.49377514387,
+    "avg_inventory_value": 311933.05579388625,
+    "avg_safety_stock_value": 122424.54450365942,
+    "weeks_of_cover": 3.6910644707246387,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8658695273410976,
+    "units_short": 124841.2667749101,
+    "share_short": 0.13413047265890238,
+    "lost_revenue": 293599.33627662575,
+    "avg_inventory_units": 108284.2805513988,
+    "avg_inventory_value": 319716.4912280972,
+    "avg_safety_stock_value": 127737.27578763846,
+    "weeks_of_cover": 3.722928382795246,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8658702686554144,
+    "units_short": 124840.57680031622,
+    "share_short": 0.1341297313445855,
+    "lost_revenue": 295791.3047688006,
+    "avg_inventory_units": 99887.77612146613,
+    "avg_inventory_value": 292427.3830970989,
+    "avg_safety_stock_value": 103682.4591830234,
+    "weeks_of_cover": 3.4342476574001646,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_tweedie",
+   "lead": 3,
+   "service": 0.9,
+   "z": 1.2815515655446004,
+   "z_same_service": 1.0506439208984375,
+   "model_run": {
+    "fill_rate": 0.8812776367470957,
+    "units_short": 110500.24598582421,
+    "share_short": 0.11872236325290408,
+    "lost_revenue": 253212.50527526607,
+    "avg_inventory_units": 122257.27045776023,
+    "avg_inventory_value": 362941.9602457391,
+    "avg_safety_stock_value": 127930.7441314736,
+    "weeks_of_cover": 4.203334591803692,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8658695273410976,
+    "units_short": 124841.2667749101,
+    "share_short": 0.13413047265890238,
+    "lost_revenue": 293599.33627662575,
+    "avg_inventory_units": 108284.2805513988,
+    "avg_inventory_value": 319716.4912280972,
+    "avg_safety_stock_value": 127737.27578763846,
+    "weeks_of_cover": 3.722928382795246,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8658722054741997,
+    "units_short": 124838.77411591602,
+    "share_short": 0.13412779452580031,
+    "lost_revenue": 281717.6032405023,
+    "avg_inventory_units": 112664.58873699026,
+    "avg_inventory_value": 336971.4079104386,
+    "avg_safety_stock_value": 104880.41389160044,
+    "weeks_of_cover": 3.8735280228029034,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_log",
+   "lead": 3,
+   "service": 0.9,
+   "z": 1.2815515655446004,
+   "z_same_service": 1.10137939453125,
+   "model_run": {
+    "fill_rate": 0.8779636141695342,
+    "units_short": 113584.75592977687,
+    "share_short": 0.12203638583046578,
+    "lost_revenue": 271486.9217925233,
+    "avg_inventory_units": 108514.40509770138,
+    "avg_inventory_value": 311708.12243957724,
+    "avg_safety_stock_value": 123246.40792190512,
+    "weeks_of_cover": 3.730840308705869,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8658695273410976,
+    "units_short": 124841.2667749101,
+    "share_short": 0.13413047265890238,
+    "lost_revenue": 293599.33627662575,
+    "avg_inventory_units": 108284.2805513988,
+    "avg_inventory_value": 319716.4912280972,
+    "avg_safety_stock_value": 127737.27578763846,
+    "weeks_of_cover": 3.722928382795246,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8658737277369157,
+    "units_short": 124837.3572775046,
+    "share_short": 0.13412627226308452,
+    "lost_revenue": 294948.57155827165,
+    "avg_inventory_units": 101681.07008323472,
+    "avg_inventory_value": 293791.43812790577,
+    "avg_safety_stock_value": 105919.30733391567,
+    "weeks_of_cover": 3.4959030052952325,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "ensemble",
+   "lead": 3,
+   "service": 0.95,
+   "z": 1.6448536269514722,
+   "z_same_service": 1.4187164306640625,
+   "model_run": {
+    "fill_rate": 0.8981156819292786,
+    "units_short": 94828.31962273373,
+    "share_short": 0.10188431807072156,
+    "lost_revenue": 232336.52038535534,
+    "avg_inventory_units": 121795.35411328492,
+    "avg_inventory_value": 349600.54234430386,
+    "avg_safety_stock_value": 157130.20175598853,
+    "weeks_of_cover": 4.187453418095308,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8867562129635234,
+    "units_short": 105401.08856526528,
+    "share_short": 0.11324378703647646,
+    "lost_revenue": 253594.03181253865,
+    "avg_inventory_units": 123124.13915553004,
+    "avg_inventory_value": 358082.60500426835,
+    "avg_safety_stock_value": 163949.01853747174,
+    "weeks_of_cover": 4.233138456802842,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.88675621936908,
+    "units_short": 105401.0826033257,
+    "share_short": 0.11324378063092007,
+    "lost_revenue": 254962.03661271563,
+    "avg_inventory_units": 112720.61981603017,
+    "avg_inventory_value": 325932.9556173328,
+    "avg_safety_stock_value": 135527.6818144238,
+    "weeks_of_cover": 3.8754544307119194,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_tweedie",
+   "lead": 3,
+   "service": 0.95,
+   "z": 1.6448536269514722,
+   "z_same_service": 1.3734283447265625,
+   "model_run": {
+    "fill_rate": 0.901276245268507,
+    "units_short": 91886.64109756352,
+    "share_short": 0.09872375473149307,
+    "lost_revenue": 213596.63782318018,
+    "avg_inventory_units": 138117.4574787325,
+    "avg_inventory_value": 405318.29681726435,
+    "avg_safety_stock_value": 164197.33246850135,
+    "weeks_of_cover": 4.748624638670571,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8867562129635234,
+    "units_short": 105401.08856526528,
+    "share_short": 0.11324378703647646,
+    "lost_revenue": 253594.03181253865,
+    "avg_inventory_units": 123124.13915553004,
+    "avg_inventory_value": 358082.60500426835,
+    "avg_safety_stock_value": 163949.01853747174,
+    "weeks_of_cover": 4.233138456802842,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8867574463576681,
+    "units_short": 105399.94058983229,
+    "share_short": 0.11324255364233199,
+    "lost_revenue": 242537.84652407753,
+    "avg_inventory_units": 126197.2776400622,
+    "avg_inventory_value": 373520.4131213629,
+    "avg_safety_stock_value": 137102.33351200444,
+    "weeks_of_cover": 4.338796216452401,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_log",
+   "lead": 3,
+   "service": 0.95,
+   "z": 1.6448536269514722,
+   "z_same_service": 1.4349517822265625,
+   "model_run": {
+    "fill_rate": 0.8972008844083349,
+    "units_short": 95679.76284136433,
+    "share_short": 0.10279911559166509,
+    "lost_revenue": 233475.53015222706,
+    "avg_inventory_units": 122972.12381981756,
+    "avg_inventory_value": 349208.53921999846,
+    "avg_safety_stock_value": 158185.05203334417,
+    "weeks_of_cover": 4.227912008374111,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8867562129635234,
+    "units_short": 105401.08856526528,
+    "share_short": 0.11324378703647646,
+    "lost_revenue": 253594.03181253865,
+    "avg_inventory_units": 123124.13915553004,
+    "avg_inventory_value": 358082.60500426835,
+    "avg_safety_stock_value": 163949.01853747174,
+    "weeks_of_cover": 4.233138456802842,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.886760013881453,
+    "units_short": 105397.5508799071,
+    "share_short": 0.11323998611854708,
+    "lost_revenue": 254111.68266218004,
+    "avg_inventory_units": 114520.31621122401,
+    "avg_inventory_value": 327341.7938702389,
+    "avg_safety_stock_value": 137998.85814614524,
+    "weeks_of_cover": 3.937329901056861,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "ensemble",
+   "lead": 3,
+   "service": 0.98,
+   "z": 2.0537489106318225,
+   "z_same_service": 1.8384857177734375,
+   "model_run": {
+    "fill_rate": 0.9154162850459832,
+    "units_short": 78725.86977487657,
+    "share_short": 0.08458371495401702,
+    "lost_revenue": 196354.45170274802,
+    "avg_inventory_units": 138682.2525083909,
+    "avg_inventory_value": 393146.25275928783,
+    "avg_safety_stock_value": 196191.30565545495,
+    "weeks_of_cover": 4.7680428906612535,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.9065733513004465,
+    "units_short": 86956.38614386607,
+    "share_short": 0.09342664869955365,
+    "lost_revenue": 214572.66340024472,
+    "avg_inventory_units": 140492.31202861757,
+    "avg_inventory_value": 402536.8272789553,
+    "avg_safety_stock_value": 204705.2167459658,
+    "weeks_of_cover": 4.8302746562331915,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.9065738200292006,
+    "units_short": 86955.94987692157,
+    "share_short": 0.09342617997079927,
+    "lost_revenue": 214981.90996681195,
+    "avg_inventory_units": 129735.73140260944,
+    "avg_inventory_value": 370154.6383956649,
+    "avg_safety_stock_value": 175627.56164185205,
+    "weeks_of_cover": 4.460452008749445,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_tweedie",
+   "lead": 3,
+   "service": 0.98,
+   "z": 2.0537489106318225,
+   "z_same_service": 1.754638671875,
+   "model_run": {
+    "fill_rate": 0.919437423084988,
+    "units_short": 74983.21565076252,
+    "share_short": 0.08056257691501165,
+    "lost_revenue": 176254.66439526266,
+    "avg_inventory_units": 156608.97828887118,
+    "avg_inventory_value": 454309.0307086571,
+    "avg_safety_stock_value": 205015.2592062739,
+    "weeks_of_cover": 5.384382731300064,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.9065733513004465,
+    "units_short": 86956.38614386607,
+    "share_short": 0.09342664869955365,
+    "lost_revenue": 214572.66340024472,
+    "avg_inventory_units": 140492.31202861757,
+    "avg_inventory_value": 402536.8272789553,
+    "avg_safety_stock_value": 204705.2167459658,
+    "weeks_of_cover": 4.8302746562331915,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.9065764264902514,
+    "units_short": 86953.52392633083,
+    "share_short": 0.09342357350974846,
+    "lost_revenue": 202613.56438403638,
+    "avg_inventory_units": 143022.53628970898,
+    "avg_inventory_value": 418313.3486477547,
+    "avg_safety_stock_value": 175156.61250777604,
+    "weeks_of_cover": 4.91726644921078,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_log",
+   "lead": 3,
+   "service": 0.98,
+   "z": 2.0537489106318225,
+   "z_same_service": 1.850555419921875,
+   "model_run": {
+    "fill_rate": 0.915137934239457,
+    "units_short": 78984.94339629645,
+    "share_short": 0.08486206576054285,
+    "lost_revenue": 196637.29233248337,
+    "avg_inventory_units": 139954.69292145743,
+    "avg_inventory_value": 392950.00718875276,
+    "avg_safety_stock_value": 197508.38188187513,
+    "weeks_of_cover": 4.811790741273537,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.9065733513004465,
+    "units_short": 86956.38614386607,
+    "share_short": 0.09342664869955365,
+    "lost_revenue": 214572.66340024472,
+    "avg_inventory_units": 140492.31202861757,
+    "avg_inventory_value": 402536.8272789553,
+    "avg_safety_stock_value": 204705.2167459658,
+    "weeks_of_cover": 4.8302746562331915,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.906576322325429,
+    "units_short": 86953.62087721852,
+    "share_short": 0.09342367767457092,
+    "lost_revenue": 214469.54207135155,
+    "avg_inventory_units": 131435.13911460352,
+    "avg_inventory_value": 371018.6232448366,
+    "avg_safety_stock_value": 177967.32827435056,
+    "weeks_of_cover": 4.5188794478265395,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "ensemble",
+   "lead": 4,
+   "service": 0.9,
+   "z": 1.2815515655446004,
+   "z_same_service": 0.9175567626953125,
+   "model_run": {
+    "fill_rate": 0.8755496726554888,
+    "units_short": 115831.51992426728,
+    "share_short": 0.12445032734451142,
+    "lost_revenue": 279389.9665076239,
+    "avg_inventory_units": 135992.0911506645,
+    "avg_inventory_value": 404014.30155525065,
+    "avg_safety_stock_value": 136874.80181231533,
+    "weeks_of_cover": 4.675552290714711,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8529278954155506,
+    "units_short": 136886.62598145305,
+    "share_short": 0.14707210458444908,
+    "lost_revenue": 322892.2644476489,
+    "avg_inventory_units": 136733.1062899471,
+    "avg_inventory_value": 411852.571685088,
+    "avg_safety_stock_value": 142814.6159608988,
+    "weeks_of_cover": 4.701029176926341,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8529325931425068,
+    "units_short": 136882.25359557764,
+    "share_short": 0.14706740685749334,
+    "lost_revenue": 324289.12766320305,
+    "avg_inventory_units": 120884.27517897668,
+    "avg_inventory_value": 364152.33795580996,
+    "avg_safety_stock_value": 97998.70986236937,
+    "weeks_of_cover": 4.156129558286377,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_tweedie",
+   "lead": 4,
+   "service": 0.9,
+   "z": 1.2815515655446004,
+   "z_same_service": 0.8541107177734375,
+   "model_run": {
+    "fill_rate": 0.8812108997920215,
+    "units_short": 110562.36107307492,
+    "share_short": 0.11878910020797848,
+    "lost_revenue": 248471.56456083184,
+    "avg_inventory_units": 156869.99407324917,
+    "avg_inventory_value": 472204.69025008654,
+    "avg_safety_stock_value": 143030.92014505368,
+    "weeks_of_cover": 5.39335673073073,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8529278954155506,
+    "units_short": 136886.62598145305,
+    "share_short": 0.14707210458444908,
+    "lost_revenue": 322892.2644476489,
+    "avg_inventory_units": 136733.1062899471,
+    "avg_inventory_value": 411852.571685088,
+    "avg_safety_stock_value": 142814.6159608988,
+    "weeks_of_cover": 4.701029176926341,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8529323955969276,
+    "units_short": 136882.43746013776,
+    "share_short": 0.14706760440307257,
+    "lost_revenue": 304166.9014113074,
+    "avg_inventory_units": 137010.7812941454,
+    "avg_inventory_value": 418700.18533944734,
+    "avg_safety_stock_value": 95325.26443208147,
+    "weeks_of_cover": 4.710575937998756,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_log",
+   "lead": 4,
+   "service": 0.9,
+   "z": 1.2815515655446004,
+   "z_same_service": 0.899078369140625,
+   "model_run": {
+    "fill_rate": 0.8766106186704523,
+    "units_short": 114844.04972556997,
+    "share_short": 0.12338938132954781,
+    "lost_revenue": 276683.63478924223,
+    "avg_inventory_units": 138174.7142729906,
+    "avg_inventory_value": 405667.0215420675,
+    "avg_safety_stock_value": 137793.6730480242,
+    "weeks_of_cover": 4.750593187968454,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8529278954155506,
+    "units_short": 136886.62598145305,
+    "share_short": 0.14707210458444908,
+    "lost_revenue": 322892.2644476489,
+    "avg_inventory_units": 136733.1062899471,
+    "avg_inventory_value": 411852.571685088,
+    "avg_safety_stock_value": 142814.6159608988,
+    "weeks_of_cover": 4.701029176926341,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8529292787677782,
+    "units_short": 136885.33843328408,
+    "share_short": 0.1470707212322216,
+    "lost_revenue": 322969.0649954732,
+    "avg_inventory_units": 122265.63065884377,
+    "avg_inventory_value": 363409.3799744823,
+    "avg_safety_stock_value": 96669.78229570319,
+    "weeks_of_cover": 4.203622024381545,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "ensemble",
+   "lead": 4,
+   "service": 0.95,
+   "z": 1.6448536269514722,
+   "z_same_service": 1.27655029296875,
+   "model_run": {
+    "fill_rate": 0.8943671891755955,
+    "units_short": 98317.21051076015,
+    "share_short": 0.10563281082440427,
+    "lost_revenue": 240487.7895848978,
+    "avg_inventory_units": 151991.34821196427,
+    "avg_inventory_value": 445886.57987085084,
+    "avg_safety_stock_value": 175676.90622232363,
+    "weeks_of_cover": 5.225623713028656,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8752697925827589,
+    "units_short": 116092.01690256002,
+    "share_short": 0.12473020741724104,
+    "lost_revenue": 276181.3693751388,
+    "avg_inventory_units": 152929.72388569443,
+    "avg_inventory_value": 453560.0189309873,
+    "avg_safety_stock_value": 183300.57514707994,
+    "weeks_of_cover": 5.257886063682557,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8752736440224391,
+    "units_short": 116088.43219433508,
+    "share_short": 0.12472635597756107,
+    "lost_revenue": 279941.4687737877,
+    "avg_inventory_units": 135776.67684957015,
+    "avg_inventory_value": 403447.7949612282,
+    "avg_safety_stock_value": 136340.64601942064,
+    "weeks_of_cover": 4.668146118632112,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_tweedie",
+   "lead": 4,
+   "service": 0.95,
+   "z": 1.6448536269514722,
+   "z_same_service": 1.1824493408203125,
+   "model_run": {
+    "fill_rate": 0.8998662681157572,
+    "units_short": 93198.9702825994,
+    "share_short": 0.10013373188424263,
+    "lost_revenue": 211759.33045671106,
+    "avg_inventory_units": 174794.88342187798,
+    "avg_inventory_value": 520104.2310133283,
+    "avg_safety_stock_value": 183578.19856185117,
+    "weeks_of_cover": 6.0096334328952565,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8752697925827589,
+    "units_short": 116092.01690256002,
+    "share_short": 0.12473020741724104,
+    "lost_revenue": 276181.3693751388,
+    "avg_inventory_units": 152929.72388569443,
+    "avg_inventory_value": 453560.0189309873,
+    "avg_safety_stock_value": 183300.57514707994,
+    "weeks_of_cover": 5.257886063682557,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8752714674227213,
+    "units_short": 116090.45805363926,
+    "share_short": 0.1247285325772787,
+    "lost_revenue": 260252.6050857429,
+    "avg_inventory_units": 152135.00760114193,
+    "avg_inventory_value": 459536.1357777835,
+    "avg_safety_stock_value": 131970.35670630258,
+    "weeks_of_cover": 5.230562875155431,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_log",
+   "lead": 4,
+   "service": 0.95,
+   "z": 1.6448536269514722,
+   "z_same_service": 1.2578582763671875,
+   "model_run": {
+    "fill_rate": 0.8958229186101536,
+    "units_short": 96962.29761819277,
+    "share_short": 0.10417708138984659,
+    "lost_revenue": 237385.03513642433,
+    "avg_inventory_units": 154304.0444680676,
+    "avg_inventory_value": 447706.78282453184,
+    "avg_safety_stock_value": 176856.26468544945,
+    "weeks_of_cover": 5.305136662542547,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8752697925827589,
+    "units_short": 116092.01690256002,
+    "share_short": 0.12473020741724104,
+    "lost_revenue": 276181.3693751388,
+    "avg_inventory_units": 152929.72388569443,
+    "avg_inventory_value": 453560.0189309873,
+    "avg_safety_stock_value": 183300.57514707994,
+    "weeks_of_cover": 5.257886063682557,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8752752768684363,
+    "units_short": 116086.91243108726,
+    "share_short": 0.1247247231315637,
+    "lost_revenue": 279351.9355502817,
+    "avg_inventory_units": 137149.95696763557,
+    "avg_inventory_value": 402984.06689327,
+    "avg_safety_stock_value": 135246.1475093563,
+    "weeks_of_cover": 4.715360945225963,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "ensemble",
+   "lead": 4,
+   "service": 0.98,
+   "z": 2.0537489106318225,
+   "z_same_service": 1.698455810546875,
+   "model_run": {
+    "fill_rate": 0.9121702725537878,
+    "units_short": 81747.07967192482,
+    "share_short": 0.08782972744621224,
+    "lost_revenue": 202433.7563072596,
+    "avg_inventory_units": 170793.23975595197,
+    "avg_inventory_value": 494658.55076651747,
+    "avg_safety_stock_value": 219348.54802001818,
+    "weeks_of_cover": 5.872052680584331,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8968668568597686,
+    "units_short": 95990.65731205458,
+    "share_short": 0.1031331431402313,
+    "lost_revenue": 230480.65267866378,
+    "avg_inventory_units": 171955.25214975045,
+    "avg_inventory_value": 502434.87571004144,
+    "avg_safety_stock_value": 228867.3899964039,
+    "weeks_of_cover": 5.912003898803662,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8968701551873606,
+    "units_short": 95987.58741014003,
+    "share_short": 0.10312984481263937,
+    "lost_revenue": 235285.91581107076,
+    "avg_inventory_units": 154414.55477838355,
+    "avg_inventory_value": 452217.71332965186,
+    "avg_safety_stock_value": 181401.8325175916,
+    "weeks_of_cover": 5.308936124188982,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_tweedie",
+   "lead": 4,
+   "service": 0.98,
+   "z": 2.0537489106318225,
+   "z_same_service": 1.579254150390625,
+   "model_run": {
+    "fill_rate": 0.9170586647596872,
+    "units_short": 77197.23306824498,
+    "share_short": 0.08294133524031284,
+    "lost_revenue": 176096.82132822106,
+    "avg_inventory_units": 196021.4624599273,
+    "avg_inventory_value": 576072.3329909651,
+    "avg_safety_stock_value": 229214.02800498405,
+    "weeks_of_cover": 6.739425727473877,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8968668568597686,
+    "units_short": 95990.65731205458,
+    "share_short": 0.1031331431402313,
+    "lost_revenue": 230480.65267866378,
+    "avg_inventory_units": 171955.25214975045,
+    "avg_inventory_value": 502434.87571004144,
+    "avg_safety_stock_value": 228867.3899964039,
+    "weeks_of_cover": 5.912003898803662,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8968713319388208,
+    "units_short": 95986.49215460193,
+    "share_short": 0.10312866806117887,
+    "lost_revenue": 217632.74385281274,
+    "avg_inventory_units": 171489.7926833422,
+    "avg_inventory_value": 511278.6976924196,
+    "avg_safety_stock_value": 176256.79710927318,
+    "weeks_of_cover": 5.896000908806333,
+    "weeks": 32
+   }
+  },
+  {
+   "model": "gbm_log",
+   "lead": 4,
+   "service": 0.98,
+   "z": 2.0537489106318225,
+   "z_same_service": 1.6675872802734375,
+   "model_run": {
+    "fill_rate": 0.913058729471838,
+    "units_short": 80920.15283773438,
+    "share_short": 0.08694127052816225,
+    "lost_revenue": 201233.25881191215,
+    "avg_inventory_units": 173332.33061562874,
+    "avg_inventory_value": 496819.91231964744,
+    "avg_safety_stock_value": 220821.08400693032,
+    "weeks_of_cover": 5.959349316622834,
+    "weeks": 32
+   },
+   "base_run": {
+    "fill_rate": 0.8968668568597686,
+    "units_short": 95990.65731205458,
+    "share_short": 0.1031331431402313,
+    "lost_revenue": 230480.65267866378,
+    "avg_inventory_units": 171955.25214975045,
+    "avg_inventory_value": 502434.87571004144,
+    "avg_safety_stock_value": 228867.3899964039,
+    "weeks_of_cover": 5.912003898803662,
+    "weeks": 32
+   },
+   "model_same_service": {
+    "fill_rate": 0.8968715178028024,
+    "units_short": 95986.31916263053,
+    "share_short": 0.10312848219719745,
+    "lost_revenue": 235201.43311926234,
+    "avg_inventory_units": 155346.11656615447,
+    "avg_inventory_value": 450400.9847484534,
+    "avg_safety_stock_value": 179300.60924188784,
+    "weeks_of_cover": 5.340964206218613,
+    "weeks": 32
+   }
+  }
+ ],
+ "runtime_s": 21.7
+}

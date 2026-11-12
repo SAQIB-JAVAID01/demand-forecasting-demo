@@ -1,0 +1,71 @@
+{
+  "macro_estimates": {
+    "confidence": {
+      "effect": 0.1454936253902885,
+      "lo95": 0.011204742123064076,
+      "hi95": 0.29761619101475373,
+      "p_value": 0.03275251849924132
+    },
+    "unemployment": {
+      "effect": -0.36281273672189107,
+      "lo95": -0.5768962161117211,
+      "hi95": -0.04040657648419219,
+      "p_value": 0.03097441825077835
+    },
+    "inflation": {
+      "effect": 0.1904077872636648,
+      "lo95": -0.058473348672700945,
+      "hi95": 0.5050776289553636,
+      "p_value": 0.14526178129338357
+    },
+    "latest": {
+      "confidence": 96.06461,
+      "unemployment": 8.4,
+      "inflation": 4.180418041804179
+    },
+    "latest_month": "2011-11-01"
+  },
+  "price": {
+    "elasticity": -3.2108016507547057,
+    "lo95": -3.515696419672488,
+    "hi95": -2.9497224038949703
+  },
+  "assumed_sensitivity": {
+    "confidence": 0.015,
+    "unemployment": -0.04,
+    "inflation": -0.01
+  },
+  "scenarios": {
+    "Recession": {
+      "confidence": -3.0,
+      "unemployment": 1.5,
+      "inflation": 1.0
+    },
+    "Base": {
+      "confidence": 0.0,
+      "unemployment": 0.0,
+      "inflation": 0.0
+    },
+    "Boom": {
+      "confidence": 2.0,
+      "unemployment": -1.0,
+      "inflation": -1.0
+    }
+  },
+  "segments": {
+    "units": {
+      "A": 0.366272475445685,
+      "B": 0.3068780599725453,
+      "C": 0.3268494645817697
+    },
+    "price": 2.3492637010939097
+  },
+  "horizon_weeks": 26,
+  "phase_in_weeks": 13,
+  "totals": {
+    "Recession": 583690.0124642185,
+    "Base": 639893.236766277,
+    "Boom": 682662.3106784489
+  },
+  "base_total": 639893.236766277
+}

@@ -95,12 +95,12 @@ the last 8 dates (6,400 product-weeks) are the out-of-sample test below.
 | LightGBM (L1) | Machine learning | 46.4% | 74.9% | -20.7% | -8.2% (-10 to -6) |
 | LightGBM + engineered features | Machine learning | 46.3% | 72.7% | -24.4% | -8.1% (-11 to -6) |
 | LightGBM (log target) | Machine learning | 46.0% | 72.5% | -24.6% | -7.5% (-10 to -5) |
-| XGBoost (Tweedie) | Machine learning | 43.3% | 81.6% | -3.4% | -3.0% (-6 to -0) |
+| XGBoost (Tweedie) | Machine learning | 43.3% | 81.9% | -3.4% | -2.9% (-6 to +0) |
 | LightGBM (Tweedie) | Machine learning | 42.3% | 81.4% | -2.1% | -1.2% (-4 to +1) |
 | 13-week average | Baseline | 41.6% | 80.7% | -8.8% | +0.0% (+0 to +0) |
 | Exponential smoothing | Baseline | 41.4% | 82.0% | -2.4% | +0.5% (-3 to +4) |
 | HistGradientBoosting (Poisson) | Machine learning | 40.9% | 82.7% | +1.6% | +1.2% (-2 to +4) |
-| Holt damped trend (ETS) | Statistical | 40.8% | 81.3% | -1.3% | +1.5% (-2 to +5) |
+| Holt damped trend (ETS) | Statistical | 40.7% | 81.3% | -1.3% | +1.5% (-2 to +5) |
 | TSB / Croston (intermittent) | Statistical | 40.7% | 80.9% | -5.7% | +1.6% (+1 to +3) |
 | 4-week average | Baseline | 40.3% | 79.8% | -5.2% | +2.3% (-1 to +5) |
 | SARIMAX top-down | Statistical | 30.2% | 70.8% | +16.9% | +19.5% (+15 to +23) |
@@ -129,9 +129,9 @@ change:
 
 | Scenario | Change in indicators | Units, next 26 weeks | vs base |
 |---|---|---|---|
-| Recession | confidence −3, unemployment +1.5 pts, inflation +1 pt | 579,921 | -8.9% |
-| Base | none | 636,304 | – |
-| Boom | confidence +2, unemployment −1 pt, inflation −1 pt | 679,208 | +6.7% |
+| Recession | confidence −3, unemployment +1.5 pts, inflation +1 pt | 583,690 | -8.8% |
+| Base | none | 639,893 | – |
+| Boom | confidence +2, unemployment −1 pt, inflation −1 pt | 682,662 | +6.7% |
 
 The sensitivities are editable assumptions (confidence +1.5%, unemployment −4%, inflation −1% of sales per unit),
 shown beside the effects estimated from the real 2009–2011 series (for example unemployment

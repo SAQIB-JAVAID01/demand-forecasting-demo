@@ -167,6 +167,79 @@ The three products are the ones at the 25th, 50th and 75th percentile of model e
 Importance was recorded for the Tweedie-setting models. Recent averages carry most of the signal, which is why the
 simple averages are hard to beat on this data.
 
+## Model lab: more models on the same backtest
+
+![Model leaderboard](figures/07_model_leaderboard.png)
+
+Statistical models (Holt damped trend, TSB / Croston for intermittent demand, SARIMAX on the weekly total split by
+product share), XGBoost, scikit-learn HistGradientBoosting, LightGBM on 49 engineered features and
+an ensemble were added and run on the same 13 forecast dates. The ensemble members were chosen on the 5 selection
+dates (LightGBM + engineered features, LightGBM (log target), LightGBM (L1)); the table is the final test
+(6,400 product-weeks).
+
+| Model | Family | Accuracy (1 - WAPE) | Weekly-total accuracy | Bias | A-item accuracy | Error vs 13-week average (95% range) |
+|---|---|---|---|---|---|---|
+| Ensemble (top 3 on selection folds) | Ensemble | 46.7% | 73.4% | -23.2% | 49.8% | -8.7% (-11 to -7) |
+| LightGBM (L1) | Machine learning | 46.4% | 74.9% | -20.7% | 49.8% | -8.2% (-10 to -6) |
+| LightGBM + engineered features | Machine learning | 46.3% | 72.7% | -24.4% | 49.6% | -8.1% (-11 to -6) |
+| LightGBM (log target) | Machine learning | 46.0% | 72.5% | -24.6% | 48.6% | -7.5% (-10 to -5) |
+| XGBoost (Tweedie) | Machine learning | 43.3% | 81.9% | -3.4% | 48.7% | -2.9% (-6 to +0) |
+| LightGBM (Tweedie) | Machine learning | 42.3% | 81.4% | -2.1% | 48.2% | -1.2% (-4 to +1) |
+| 13-week average | Baseline | 41.6% | 80.7% | -8.8% | 46.1% | +0.0% (+0 to +0) |
+| Exponential smoothing | Baseline | 41.4% | 82.0% | -2.4% | 47.4% | +0.5% (-3 to +4) |
+| HistGradientBoosting (Poisson) | Machine learning | 40.9% | 82.7% | +1.6% | 46.7% | +1.2% (-2 to +4) |
+| Holt damped trend (ETS) | Statistical | 40.7% | 81.3% | -1.3% | 48.1% | +1.5% (-2 to +5) |
+| TSB / Croston (intermittent) | Statistical | 40.7% | 80.9% | -5.7% | 45.0% | +1.6% (+1 to +3) |
+| 4-week average | Baseline | 40.3% | 79.8% | -5.2% | 45.4% | +2.3% (-1 to +5) |
+| SARIMAX top-down | Statistical | 30.2% | 70.8% | +16.9% | 36.8% | +19.5% (+15 to +23) |
+| Last week's sales | Baseline | 25.7% | 77.8% | +0.5% | 33.1% | +27.2% (+20 to +34) |
+| Same week last year | Baseline | 10.9% | 67.3% | +28.5% | 25.4% | +52.6% (+41 to +64) |
+
+**Ensemble (top 3 on selection folds)** is chosen on the selection dates and has the best final-test accuracy, 46.7%:
++5.1 accuracy points over the 13-week average (Forecast Value Added). It under-forecasts totals
+(-23.2%), so the Tweedie setting stays the choice for total stock. Engineered features include
+intermittency (ADI, CV²), trend, Fourier seasonality, UK bank holidays, price against its 13- and 52-week levels,
+product class and UK economic indicators taken at their publication date; leakage tests cover all of them.
+
+## Inventory planning: replenishment simulation
+
+The same weekly order-up-to policy with lost sales runs once with the forecast (ensemble) and once with the
+13-week average, for 200 products over the 32 final-test weeks. Safety stock =
+z x sigma x sqrt(L + R), sigma from the last 13 weekly misses. Lead time 1 week, review 1 week, 95% target
+(z = 1.64), unit cost 45% of price, holding rate 25% a year; all four are editable in the app.
+
+| Same policy | Forecast | 13-week average |
+|---|---|---|
+| Simulated fill rate | 91.0% | 90.2% |
+| Units short | 84,016 (9.0%) | 91,657 (9.8%) |
+| Weeks of cover | 2.2 | 2.3 |
+
+To match the benchmark's fill rate the forecast needs 11.3%
+less stock: about GBP 2,333 a year of
+carrying cost (GBP 1,400 to 3,266 at a 15-35% holding rate). Lost sales avoided at the same
+target: about GBP 29,587 a year of revenue. Simulation on recorded
+history with stated assumptions, not measured savings.
+
+## Sales projection under economic scenarios
+
+![Sales projection](figures/08_sales_projection.png)
+
+A SARIMAX model of weekly units (Fourier seasonality, trading days, the Christmas shutdown) projects the next
+26 weeks with 80% and 95% prediction intervals. Scenarios change UK consumer confidence,
+unemployment and inflation (phased in over 13 weeks):
+
+| Scenario | Units, next 26 weeks | vs base |
+|---|---|---|
+| Recession (confidence -3, unemployment +1.5 pts, inflation +1 pt) | 583,690 | -8.8% |
+| Base | 639,893 | - |
+| Boom (confidence +2, unemployment -1 pt, inflation -1 pt) | 682,662 | +6.7% |
+
+Sensitivities are stated assumptions (confidence +1.5%, unemployment -4%, inflation -1% of sales per unit). The
+effects estimated from the real 2009-2011 series are wide (unemployment -36% per
+point, 95% range -58% to -4%) and mixed up with
+the trend, so they are shown but not used. Own-price elasticity, estimated with product and week fixed effects:
+-3.21. Economic data: OECD via FRED, see `data/external/SOURCES.md`.
+
 ## Limits
 
 - Two years of data. Only one earlier Christmas season is available for training, so the pre-Christmas peak is the
@@ -183,8 +256,8 @@ simple averages are hard to beat on this data.
 
 ```
 pip install -r requirements.txt
-python run_all.py            # download, clean, backtest, score, report (about 10 minutes)
-python -m pytest tests -q    # leakage tests
+python run_all.py            # download, clean, backtest, model lab, scenarios, inventory, report (about 12 minutes)
+python -m pytest tests -q    # leakage, simulation and scenario tests
 python app/desktop.py          # PyQt6 desktop app
 python -m src.build_dashboard  # single-file HTML dashboard: app/dashboard.html
 ```

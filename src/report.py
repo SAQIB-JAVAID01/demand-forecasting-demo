@@ -446,6 +446,7 @@ The three products are the ones at the 25th, 50th and 75th percentile of model e
 Importance was recorded for the Tweedie-setting models. Recent averages carry most of the signal, which is why the
 simple averages are hard to beat on this data.
 
+{extended_sections()}
 ## Limits
 
 - Two years of data. Only one earlier Christmas season is available for training, so the pre-Christmas peak is the
@@ -462,13 +463,138 @@ simple averages are hard to beat on this data.
 
 ```
 pip install -r requirements.txt
-python run_all.py            # download, clean, backtest, score, report (about 10 minutes)
-python -m pytest tests -q    # leakage tests
+python run_all.py            # download, clean, backtest, model lab, scenarios, inventory, report (about 12 minutes)
+python -m pytest tests -q    # leakage, simulation and scenario tests
 python app/desktop.py          # PyQt6 desktop app
 python -m src.build_dashboard  # single-file HTML dashboard: app/dashboard.html
 ```
 """
     (C.REPORTS_DIR / "REPORT.md").write_text(text, encoding="utf-8")
+
+
+def fig_leaderboard(lab: dict):
+    b = pd.DataFrame(lab["leaderboard"]).sort_values("wape", ascending=False)
+    colors = {"Baseline": NEUTRAL, "Statistical": "#8c8b84", "Machine learning": "#8fb8ea", "Ensemble": BLUE}
+    fig, ax = plt.subplots(figsize=(10, 6.4))
+    acc = 1 - b["wape"]
+    ax.barh(b["label"], acc, color=[BLUE if m == lab["best_on_selection"] else colors[f]
+                                    for m, f in zip(b["model"], b["family"])], height=0.62)
+    for y, v in enumerate(acc):
+        ax.text(v + 0.005, y, pct(v), va="center", color=INK, fontsize=9.5)
+    ax.set_xlim(0, acc.max() * 1.15)
+    ax.xaxis.set_major_formatter(lambda v, _: f"{100 * v:.0f}%")
+    ax.grid(axis="y", visible=False)
+    title(ax, "Model leaderboard, final test", "Accuracy = 1 - WAPE per product-week, out of sample. Blue = chosen on the selection folds.")
+    fig.tight_layout()
+    fig.subplots_adjust(top=0.87)
+    fig.savefig(C.FIGURES_DIR / "07_model_leaderboard.png", dpi=170)
+    plt.close(fig)
+
+
+def fig_projection(panel: pd.DataFrame, proj: pd.DataFrame, sc: dict):
+    from src import scenarios as SC
+    hist = panel.groupby("week")["units"].sum().sort_index().iloc[-52:]
+    fig, ax = plt.subplots(figsize=(10, 4.6))
+    ax.plot(hist.index, hist.values, color=INK2, lw=1.6, label="Actual units")
+    ax.fill_between(proj["week"], proj["lo95"], proj["hi95"], color=BAND, alpha=0.6, lw=0, label="95% interval")
+    ax.fill_between(proj["week"], proj["lo80"], proj["hi80"], color="#9cc3f2", alpha=0.7, lw=0, label="80% interval")
+    for name, col, ls in (("Recession", ORANGE, "--"), ("Boom", "#2e9e5b", "--")):
+        v = SC.apply(proj, SC.SCENARIOS[name], SC.ASSUMED_SENSITIVITY)
+        ax.plot(v["week"], v["mean"], color=col, lw=1.6, ls=ls, label=name)
+    ax.plot(proj["week"], proj["mean"], color=BLUE, lw=2.4, label="Base projection")
+    ax.set_ylim(0, None)
+    ax.yaxis.set_major_formatter(lambda v, _: f"{v / 1000:.0f}k")
+    ax.legend(ncols=6, loc="upper left", fontsize=8.5)
+    title(ax, f"Sales projection, next {sc['horizon_weeks']} weeks",
+          "SARIMAX on weekly units with 80% / 95% prediction intervals; scenarios are what-if assumptions.")
+    fig.tight_layout()
+    fig.savefig(C.FIGURES_DIR / "08_sales_projection.png", dpi=170)
+    plt.close(fig)
+
+
+def extended_sections() -> str:
+    """Model lab, inventory simulation and scenarios, if their outputs exist."""
+    out = []
+    lp, ip, sp = C.REPORTS_DIR / "model_lab.json", C.REPORTS_DIR / "inventory.json", C.REPORTS_DIR / "scenarios.json"
+    if lp.exists():
+        lab = json.loads(lp.read_text())
+        lb = {r["model"]: r for r in lab["leaderboard"]}
+        rows = [{"Model": r["label"], "Family": r["family"], "Accuracy (1 - WAPE)": pct(1 - r["wape"]),
+                 "Weekly-total accuracy": pct(1 - r["total_wape"]), "Bias": f"{100 * r['bias']:+.1f}%",
+                 "A-item accuracy": pct(1 - r["class_a_wape"]),
+                 "Error vs 13-week average (95% range)": f"{100 * r['vs_ma13']:+.1f}% "
+                 f"({100 * r['vs_ma13_ci95'][0]:+.0f} to {100 * r['vs_ma13_ci95'][1]:+.0f})"}
+                for r in sorted(lab["leaderboard"], key=lambda r: r["wape"])]
+        best = lb[lab["best_on_selection"]]
+        fva = lb["ma13"]["wape"] - best["wape"]
+        out.append(f"""## Model lab: more models on the same backtest
+
+![Model leaderboard](figures/07_model_leaderboard.png)
+
+Statistical models (Holt damped trend, TSB / Croston for intermittent demand, SARIMAX on the weekly total split by
+product share), XGBoost, scikit-learn HistGradientBoosting, LightGBM on {lab['n_features_ext']} engineered features and
+an ensemble were added and run on the same 13 forecast dates. The ensemble members were chosen on the 5 selection
+dates ({', '.join(lb[k]['label'] for k in lab['ensemble_members'])}); the table is the final test
+({lab['final_rows']:,} product-weeks).
+
+{md_table(pd.DataFrame(rows))}
+
+**{best['label']}** is chosen on the selection dates and has the best final-test accuracy, {pct(1 - best['wape'])}:
+{100 * fva:+.1f} accuracy points over the 13-week average (Forecast Value Added). It under-forecasts totals
+({100 * best['bias']:+.1f}%), so the Tweedie setting stays the choice for total stock. Engineered features include
+intermittency (ADI, CV²), trend, Fourier seasonality, UK bank holidays, price against its 13- and 52-week levels,
+product class and UK economic indicators taken at their publication date; leakage tests cover all of them.
+""")
+    if ip.exists():
+        inv = json.loads(ip.read_text())
+        r = next((x for x in inv["runs"] if x["model"] == "ensemble" and x["lead"] == 1 and abs(x["service"] - 0.95) < 1e-9),
+                 inv["runs"][0])
+        m, b, e = r["model_run"], r["base_run"], r["model_same_service"]
+        years = m["weeks"] / 52
+        dv = (b["avg_inventory_value"] - e["avg_inventory_value"]) * 0.45
+        out.append(f"""## Inventory planning: replenishment simulation
+
+The same weekly order-up-to policy with lost sales runs once with the forecast ({r['model']}) and once with the
+13-week average, for {inv['products']} products over the {inv['weeks_scored']} final-test weeks. Safety stock =
+z x sigma x sqrt(L + R), sigma from the last 13 weekly misses. Lead time 1 week, review 1 week, 95% target
+(z = {r['z']:.2f}), unit cost 45% of price, holding rate 25% a year; all four are editable in the app.
+
+| Same policy | Forecast | 13-week average |
+|---|---|---|
+| Simulated fill rate | {pct(m['fill_rate'])} | {pct(b['fill_rate'])} |
+| Units short | {m['units_short']:,.0f} ({pct(m['share_short'])}) | {b['units_short']:,.0f} ({pct(b['share_short'])}) |
+| Weeks of cover | {m['weeks_of_cover']:.1f} | {b['weeks_of_cover']:.1f} |
+
+To match the benchmark's fill rate the forecast needs {pct(abs(e['avg_inventory_value'] / b['avg_inventory_value'] - 1))}
+{'less' if e['avg_inventory_value'] < b['avg_inventory_value'] else 'more'} stock: about GBP {dv * 0.25:,.0f} a year of
+carrying cost (GBP {dv * 0.15:,.0f} to {dv * 0.35:,.0f} at a 15-35% holding rate). Lost sales avoided at the same
+target: about GBP {(b['lost_revenue'] - m['lost_revenue']) / years:,.0f} a year of revenue. Simulation on recorded
+history with stated assumptions, not measured savings.
+""")
+    if sp.exists():
+        sc = json.loads(sp.read_text())
+        t, me = sc["totals"], sc["macro_estimates"]
+        out.append(f"""## Sales projection under economic scenarios
+
+![Sales projection](figures/08_sales_projection.png)
+
+A SARIMAX model of weekly units (Fourier seasonality, trading days, the Christmas shutdown) projects the next
+{sc['horizon_weeks']} weeks with 80% and 95% prediction intervals. Scenarios change UK consumer confidence,
+unemployment and inflation (phased in over {sc['phase_in_weeks']} weeks):
+
+| Scenario | Units, next {sc['horizon_weeks']} weeks | vs base |
+|---|---|---|
+| Recession (confidence -3, unemployment +1.5 pts, inflation +1 pt) | {t['Recession']:,.0f} | {100 * (t['Recession'] / t['Base'] - 1):+.1f}% |
+| Base | {t['Base']:,.0f} | - |
+| Boom (confidence +2, unemployment -1 pt, inflation -1 pt) | {t['Boom']:,.0f} | {100 * (t['Boom'] / t['Base'] - 1):+.1f}% |
+
+Sensitivities are stated assumptions (confidence +1.5%, unemployment -4%, inflation -1% of sales per unit). The
+effects estimated from the real 2009-2011 series are wide (unemployment {100 * me['unemployment']['effect']:+.0f}% per
+point, 95% range {100 * me['unemployment']['lo95']:+.0f}% to {100 * me['unemployment']['hi95']:+.0f}%) and mixed up with
+the trend, so they are shown but not used. Own-price elasticity, estimated with product and week fixed effects:
+{sc['price']['elasticity']:.2f}. Economic data: OECD via FRED, see `data/external/SOURCES.md`.
+""")
+    return "\n".join(out)
 
 
 def main():
@@ -484,6 +610,11 @@ def main():
     skus = fig_examples(preds, panel, m)
     fig_importance(m)
     fig_cover(preds, m)
+    lp, sp = C.REPORTS_DIR / "model_lab.json", C.REPORTS_DIR / "scenarios.json"
+    if lp.exists():
+        fig_leaderboard(json.loads(lp.read_text()))
+    if sp.exists() and (C.PROCESSED_DIR / "projection.parquet").exists():
+        fig_projection(panel, pd.read_parquet(C.PROCESSED_DIR / "projection.parquet"), json.loads(sp.read_text()))
     write_report(m, skus)
     print("figures and REPORT.md written to", C.REPORTS_DIR)
 
