@@ -17,10 +17,11 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from PyQt6.QtCore import QEvent, QSize, Qt, QTimer
-from PyQt6.QtGui import QBrush, QColor, QFont, QIcon, QPainter, QPalette, QPixmap
+from PyQt6.QtCore import QEvent, QRectF, QSize, Qt, QTimer
+from PyQt6.QtGui import QBrush, QColor, QFont, QFontMetrics, QGradient, QIcon, QLinearGradient, QPainter, QPalette, QPixmap
 from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QCompleter, QFrame, QHBoxLayout, QLabel, QListWidget,
-                             QListWidgetItem, QPushButton, QSizePolicy, QSlider, QVBoxLayout, QWidget)
+                             QListWidgetItem, QPushButton, QSizePolicy, QSlider, QStyle, QStyledItemDelegate, QVBoxLayout,
+                             QWidget)
 from scipy import stats
 from sklearn.metrics import mean_absolute_error, mean_pinball_loss
 from statsmodels.nonparametric.smoothers_lowess import lowess
@@ -28,7 +29,8 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 pg.setConfigOptions(antialias=True)
 
 FRAME_MS = 33                 # about 30 frames a second
-FRAMES_PER_WEEK = 30          # at 1x one replayed week takes about one second
+FRAMES_PER_WEEK = 360         # at 1x one replayed week takes about 12 s (one day every 1.7 s)
+WARMUP_WEEKS = 6              # running scores are drawn once this many weeks have been checked
 WEEK_S = 7 * 86400.0
 TREND = "#8b5cf6"
 SCOPES = [("all", "All products"), ("A", "Class A: top sellers"), ("B", "Class B"), ("C", "Class C"),
@@ -43,6 +45,15 @@ def qcolor(hex_: str, alpha: int = 255) -> QColor:
     c = QColor(hex_)
     c.setAlpha(alpha)
     return c
+
+
+def fade(hex_: str, alpha: int) -> QBrush:
+    """Vertical gradient for areas under lines: colour at the top, transparent at the baseline."""
+    g = QLinearGradient(0, 0, 0, 1)
+    g.setCoordinateMode(QGradient.CoordinateMode.ObjectBoundingMode)
+    g.setColorAt(0, qcolor(hex_, alpha))
+    g.setColorAt(1, qcolor(hex_, 0))
+    return QBrush(g)
 
 
 def dot_icon(hex_: str) -> QIcon:
@@ -90,11 +101,12 @@ class FastText(QWidget):
     animation at full frame rate. Font comes from the style sheet (object name); colours are set in code.
     """
 
-    def __init__(self, name: str, sample: str):
+    def __init__(self, name: str, sample: str, opaque: bool = True):
         super().__init__()
         self.setObjectName(name)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
+        self.opaque = opaque
+        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, opaque)
         self.sample, self._text = sample, ""
         self.fg, self.bg = QColor("#0f172a"), QColor("#ffffff")
 
@@ -127,7 +139,8 @@ class FastText(QWidget):
 
     def paintEvent(self, _e):
         p = QPainter(self)
-        p.fillRect(self.rect(), self.bg)
+        if self.opaque:
+            p.fillRect(self.rect(), self.bg)
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
         p.setFont(self.font())
         p.setPen(self.fg)
@@ -153,7 +166,7 @@ class Ticker(FastText):
         if self.target is None or self.cur == self.target or not np.isfinite(self.target):
             return
         d = self.target - self.cur
-        self.cur = self.target if abs(d) <= 1e-4 * max(1.0, abs(self.target)) else self.cur + 0.2 * d
+        self.cur = self.target if abs(d) <= 1e-4 * max(1.0, abs(self.target)) else self.cur + 0.09 * d
         self._show()
 
     def _show(self):
@@ -193,14 +206,18 @@ def opaque(w: pg.PlotWidget):
 
 
 class LiveCard(QFrame):
-    def __init__(self, eyebrow: str, widget: QWidget | None = None, min_h: int = 0):
+    def __init__(self, eyebrow: str, widget: QWidget | None = None, min_h: int = 0, body: str = ""):
         super().__init__()
         self.setObjectName("card")
         self.lay = QVBoxLayout(self)
-        self.lay.setContentsMargins(18, 15, 18, 15)
-        self.lay.setSpacing(5)
+        self.lay.setContentsMargins(20, 16, 20, 16)
+        self.lay.setSpacing(6)
         self.head = QHBoxLayout()
+        self.head.setSpacing(6)
         self.head.addWidget(lab(eyebrow.upper(), "eyebrow"))
+        self.info = lab("ⓘ", "info")
+        self.info.setCursor(Qt.CursorShape.WhatsThisCursor)
+        self.head.addWidget(self.info)
         self.head.addStretch(1)
         self.lay.addLayout(self.head)
         self.finding = lab("", "h2", True)
@@ -209,14 +226,77 @@ class LiveCard(QFrame):
             if min_h:
                 widget.setMinimumHeight(min_h)
             self.lay.addWidget(widget, 1)
-        self.how = lab("", "cap", True)
+        self.how = lab(body, "body" if body else "cap", True)
+        self.how.setVisible(bool(body))
         self.lay.addWidget(self.how)
+        self.info.setVisible(False)
 
     def say(self, finding: str, how: str | None = None):
-        self.finding.setText(finding)
-        if how is not None:
-            self.how.setText(how)
-            self.how.setVisible(bool(how))
+        set_text(self.finding, finding)
+        if how is not None and self.how.isHidden():
+            self.info.setToolTip(f"<div style='max-width:340px'>{how}</div>" if how else "")
+            self.info.setVisible(bool(how))
+
+class FeedDelegate(QStyledItemDelegate):
+    """One feed row: coloured risk marker, product, what happened, and the size of the miss."""
+
+    ROW = 60
+
+    def __init__(self, page):
+        super().__init__(page)
+        self.page = page
+
+    def sizeHint(self, option, index):
+        return QSize(option.rect.width(), self.ROW)
+
+    def paint(self, p: QPainter, option, index):
+        d = index.data(Qt.ItemDataRole.UserRole)
+        if not d:
+            return
+        t = self.page.themes[self.page.win.theme]
+        r = QRectF(option.rect).adjusted(0, 3, -6, -3)
+        p.save()
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+        hover = bool(option.state & QStyle.StateFlag.State_MouseOver)
+        p.setBrush(QColor(t["chip"] if hover else t["raised"]))
+        p.drawRoundedRect(r, 10, 10)
+        flash = index.data(Qt.ItemDataRole.UserRole + 1) or 0.0
+        if flash > 0:
+            p.setBrush(qcolor(t["s1"], int(80 * flash)))
+            p.drawRoundedRect(r, 10, 10)
+        col = QColor(t["bad"] if d["up"] else t["warn"])
+        p.setBrush(col)
+        p.drawRoundedRect(QRectF(r.left() + 10, r.top() + 12, 3, r.height() - 24), 1.5, 1.5)
+        base = QFont(option.font)
+        right_w = 96
+        x0, w = r.left() + 24, r.width() - 24 - right_w - 8
+        f1 = QFont(base)
+        f1.setPointSizeF(9.6)
+        f1.setWeight(QFont.Weight.DemiBold)
+        p.setFont(f1)
+        p.setPen(QColor(t["ink"]))
+        fm = QFontMetrics(f1)
+        p.drawText(QRectF(x0, r.top() + 9, w, 20), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                   fm.elidedText(d["title"], Qt.TextElideMode.ElideRight, int(w)))
+        f2 = QFont(base)
+        f2.setPointSizeF(8.4)
+        p.setFont(f2)
+        p.setPen(QColor(t["muted"]))
+        fm2 = QFontMetrics(f2)
+        p.drawText(QRectF(x0, r.top() + 30, w, 18), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                   fm2.elidedText(d["sub"], Qt.TextElideMode.ElideRight, int(w)))
+        f3 = QFont(base)
+        f3.setPointSizeF(11.5)
+        f3.setWeight(QFont.Weight.DemiBold)
+        p.setFont(f3)
+        p.setPen(col)
+        rx = r.right() - right_w - 10
+        p.drawText(QRectF(rx, r.top() + 7, right_w, 24), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, d["big"])
+        p.setFont(f2)
+        p.setPen(QColor(t["muted"]))
+        p.drawText(QRectF(rx, r.top() + 30, right_w, 18), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, d["small"])
+        p.restore()
 
 
 # ===================================================================== data
@@ -305,6 +385,9 @@ class ReplayData:
             S.bias = np.where(c["y"] > 0, c["m"] / c["y"] - 1, np.nan)
             S.cov = np.where(c["cnt"] > 0, c["inside"] / c["cnt"], np.nan)
         S.cum_y, S.cum_m, S.cum_n = c["y"].to_numpy(), c["m"].to_numpy(), c["cnt"].to_numpy()
+        checked = np.cumsum(np.diff(np.concatenate([[0.0], S.cum_n])) > 0)
+        need = WARMUP_WEEKS * (2 if one else 1)          # one product is noisier, so it warms up longer
+        S.warm = int(np.searchsorted(checked, need)) if checked[-1] >= need else n - 1
 
         # day-by-day fill of each week, from the real transactions of these products
         share = np.tile(np.arange(1, 8) / 7.0, (n, 1))
@@ -327,8 +410,9 @@ class ReplayData:
         hi_top = np.nanmax(S.hi) if one and np.isfinite(S.hi).any() else 0
         m_top = np.nanmax(S.m) if np.isfinite(S.m).any() else 0
         S.ytop = max(float(S.ctx_y.max()) if len(S.ctx_y) else 0, float(S.y.max()), m_top, hi_top, 1.0) * 1.12
-        fin = np.concatenate([S.wape_m[np.isfinite(S.wape_m)], S.wape_b[np.isfinite(S.wape_b)], [0.5]])
-        S.err_top = min(float(fin.max()) * 1.15, 2.0)
+        wm_, wb_ = S.wape_m[S.warm:], S.wape_b[S.warm:]
+        fin = np.concatenate([wm_[np.isfinite(wm_)], wb_[np.isfinite(wb_)], [0.3]])
+        S.err_top = min(float(np.quantile(fin, 0.95)) * 1.2, 2.0)     # an early swing may run off the top
         return S
 
 
@@ -359,20 +443,20 @@ class LivePage(QWidget):
     def _build(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(14)
+        root.setSpacing(16)
 
         ctl = QFrame()
         ctl.setObjectName("hero")
         cl = QVBoxLayout(ctl)
-        cl.setContentsMargins(20, 14, 20, 12)
-        cl.setSpacing(9)
+        cl.setContentsMargins(24, 18, 24, 14)
+        cl.setSpacing(10)
         top = QHBoxLayout()
         top.setSpacing(8)
         txt = QVBoxLayout()
         txt.setSpacing(3)
         r1 = QHBoxLayout()
         r1.setSpacing(12)
-        self.badge = FastText("badge", "●  LIVE REPLAY  ")
+        self.badge = FastText("badge", "●  LIVE REPLAY  ", opaque=False)
         self.l_week = lab("", "hero1")
         r1.addWidget(self.badge)
         r1.addWidget(self.l_week)
@@ -395,8 +479,8 @@ class LivePage(QWidget):
         bar.setSpacing(6)
         bar.addWidget(lab("SPEED", "flabel"))
         self.b_speed, grp = [], QButtonGroup(self)
-        for v in (1, 2, 4, 8):
-            b = QPushButton(f"{v}x")
+        for v in (0.5, 1, 2, 4):
+            b = QPushButton(f"{v:g}x")
             b.setCheckable(True)
             b.setChecked(v == 1)
             b.setProperty("value", v)
@@ -423,7 +507,7 @@ class LivePage(QWidget):
         self.cb_prod.activated.connect(self._on_product)
         bar.addWidget(self.cb_prod)
         bar.addStretch(1)
-        self.l_day = FastText("kl", "Replay date  Wed 28 Sep 2011  ")
+        self.l_day = FastText("kl", "Wednesday 28 Sep 2011   ", opaque=False)
         bar.addWidget(self.l_day)
         cl.addLayout(bar)
         self.slider = QSlider(Qt.Orientation.Horizontal)
@@ -434,7 +518,7 @@ class LivePage(QWidget):
 
         # KPI tiles with sparklines
         krow = QHBoxLayout()
-        krow.setSpacing(14)
+        krow.setSpacing(16)
         self.tiles = []
         fmts = [("Units this week", lambda v: f"{v:,.0f}"), ("Error so far", lambda v: f"{100 * v:.1f}%"),
                 ("Forecast level so far", lambda v: f"{100 * v:+.1f}%"), ("Inside the 80% range", lambda v: f"{100 * v:.0f}%")]
@@ -442,10 +526,10 @@ class LivePage(QWidget):
             f = QFrame()
             f.setObjectName("card")
             l = QVBoxLayout(f)
-            l.setContentsMargins(18, 12, 18, 10)
-            l.setSpacing(2)
+            l.setContentsMargins(20, 16, 20, 12)
+            l.setSpacing(3)
             tk = Ticker(fmt)
-            note = FastText("kn", "Forecast 00,000: 100% reached by Wednesday.") if not self.tiles else lab("", "kn", True)
+            note = FastText("kn", "Forecast 00,000 · 100% reached") if not self.tiles else lab("", "kn", True)
             l.addWidget(lab(title, "kl"))
             l.addWidget(tk)
             l.addWidget(note)
@@ -493,14 +577,17 @@ class LivePage(QWidget):
         self.k_stream = LiveCard("Demand as it arrives", self.p_stream, 360)
 
         self.feed = QListWidget()
-        self.feed.setIconSize(self.feed.iconSize())
-        self.feed.setWordWrap(True)
+        self.feed.setItemDelegate(FeedDelegate(self))
+        self.feed.setUniformItemSizes(True)
+        self.feed.setMouseTracking(True)
+        self.feed.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
         self.feed.setMinimumHeight(360)
+        self.feed_items, self.feed_counts = {}, {}
         self.k_feed = LiveCard("Live anomaly and stock-risk feed", self.feed)
-        self.feed_count = lab("", "kl")
+        self.feed_count = lab("", "kn")
         self.k_feed.head.addWidget(self.feed_count)
         row = QHBoxLayout()
-        row.setSpacing(14)
+        row.setSpacing(16)
         row.addWidget(self.k_stream, 3)
         row.addWidget(self.k_feed, 2)
         root.addLayout(row, 1)
@@ -528,28 +615,24 @@ class LivePage(QWidget):
         self.p_sc = make_plot(date_axis=False)
         spi = self.p_sc.getPlotItem()
         spi.setLogMode(x=True, y=True)
-        spi.setLabel("bottom", "Actual units (+1)")
-        spi.setLabel("left", "Forecast units (+1)")
+        spi.setLabel("bottom", "Actual units")
+        spi.setLabel("left", "Forecast units")
         self.c_diag = spi.plot()
-        self.c_old = spi.plot(pen=None, symbol="o", symbolSize=4)
-        self.c_new = spi.plot(pen=None, symbol="o", symbolSize=9)
+        self.c_old = spi.plot(pen=None, symbol="o", symbolSize=6)
+        self.c_new = spi.plot(pen=None, symbol="o", symbolSize=12)
         self.k_sc = LiveCard("Forecast vs actual, product-weeks", self.p_sc, 250)
         row2 = QHBoxLayout()
-        row2.setSpacing(14)
+        row2.setSpacing(16)
         row2.addWidget(self.k_acc, 1)
         row2.addWidget(self.k_race, 1)
         row2.addWidget(self.k_sc, 1)
         root.addLayout(row2, 1)
 
-        self.k_txt = LiveCard("What you are watching")
-        self.k_txt.say(
-            "A replay of one year of real sales, the way a planner would have lived it",
-            "Each second of replay is one week. Sales fill in day by day from the cleaned transactions, so the "
-            "current week grows as orders arrive. A forecast appears only after the date it was made, so the blue "
-            "line always runs ahead of today. This is recorded history played back (a simulated live feed), not a "
-            "live connection, and every number is computed from the backtest output. Trend: LOWESS (statsmodels). "
-            "Anomaly scores: robust z-scores from the median absolute deviation (scipy). Running error and "
-            "quantile loss: scikit-learn metrics. Charts: pyqtgraph.")
+        self.k_txt = LiveCard("About this replay", body=(
+            "Real sales from a public data set, replayed day by day as a simulated live feed, not a live connection. "
+            "Forecasts appear only after the date they were made and use earlier data only. Built with pyqtgraph, "
+            "statsmodels (LOWESS trend), SciPy (robust anomaly scores) and scikit-learn (error and quantile loss)."))
+        self.k_txt.say("Recorded history, replayed honestly")
         root.addWidget(self.k_txt)
 
     # ---------------------------------------------------------------- data / scope
@@ -586,7 +669,7 @@ class LivePage(QWidget):
         x0 = S.ctx_x[0] if len(S.ctx_x) else self.x[0]
         self.p_stream.setXRange(x0, self.x[-1] + WEEK_S, padding=0.01)
         self.p_stream.setYRange(0, S.ytop, padding=0)
-        self.p_acc.setXRange(self.x[0], self.x[-1] + 7 * WEEK_S, padding=0.01)
+        self.p_acc.setXRange(self.x[S.warm], self.x[-1] + 6 * WEEK_S, padding=0.01)
         self.p_acc.setYRange(0, S.err_top, padding=0)
         top = np.log10(max(S.rows["y"].max(), S.rows["m"].max(), 1) + 1) * 1.04 if len(S.rows) else 1
         self.p_sc.setXRange(0, top, padding=0)
@@ -676,7 +759,8 @@ class LivePage(QWidget):
         for _ in range(90):
             self._animate()
         for f in list(self.flash.values()):
-            f[1] = 0.55
+            f[1] = 0.5
+            f[0].setData(Qt.ItemDataRole.UserRole + 1, 0.5)
 
     def _on_speed(self):
         self.speed = next(b.property("value") for b in self.b_speed if b.isChecked())
@@ -691,8 +775,8 @@ class LivePage(QWidget):
         if self.pos != self._drawn:
             self._draw_pos()
         self._animate()
-        if self.frame % 16 == 0:
-            self._badge(self.frame % 32 == 0)
+        if self.frame % 30 == 0:
+            self._badge(self.frame % 60 == 0)
 
     def _draw_pos(self, force: bool = False):
         S = self.S
@@ -722,17 +806,17 @@ class LivePage(QWidget):
         self.slider.setValue(cur)
         self.slider.blockSignals(False)
         day = self.data.weeks[cur] + pd.Timedelta(days=min(int(dpos), 6))
-        set_text(self.l_day, f"Replay date  {day:%a %d %b %Y}")
+        set_text(self.l_day, f"{day:%A %d %b %Y}")
         tile = self.tiles[0]
         tile.tk.set(live, instant=True)
         m_now = S.m[cur]
         if S.closed[cur]:
-            note = "Business shut this week (holiday)."
+            note = "Business shut this week (holiday)"
         elif np.isfinite(m_now) and m_now > 0:
             reached = 10 * int(10 * live / m_now)      # in steps of 10%, so the note changes about once a day
-            note = f"Forecast {m_now:,.0f}: {reached}% reached by {day:%A}."
+            note = f"Forecast {m_now:,.0f} · {reached}% reached"
         else:
-            note = f"No forecast for this week with the current filters. {day:%A}."
+            note = "No forecast for this week under the filters"
         set_text(tile.note, note)
         self._drawn = self.pos
 
@@ -741,8 +825,8 @@ class LivePage(QWidget):
         wk = self.data.weeks[cur]
         self.l_week.setText(f"Week of {wk:%d %B %Y}")
         self.l_status.setText(
-            f"{self.scope_name}{self.scope_note}. Week {cur + 1} of {self.n}. Recorded history played back as a simulated "
-            f"live feed: sales arrive day by day and each forecast was made before its week, from earlier data only.")
+            f"{self.scope_name}{self.scope_note}  ·  week {cur + 1} of {self.n}  ·  recorded sales replayed as a "
+            f"simulated live feed; every forecast was made before its week")
         self._draw_forecast()
 
     def _draw_forecast(self):
@@ -820,19 +904,22 @@ class LivePage(QWidget):
                 tl.ref.setValue(ref)
 
         # running accuracy
-        k = done + 1
-        self.c_wm.setData(self.x[:k], S.wape_m[:k], connect="finite")
-        self.c_wb.setData(self.x[:k], S.wape_b[:k], connect="finite")
-        if k and np.isfinite(S.wape_m[done]) and np.isfinite(S.wape_b[done]):
+        k, w0 = done + 1, S.warm
+        self.c_wm.setData(self.x[w0:k], S.wape_m[w0:k], connect="finite")
+        self.c_wb.setData(self.x[w0:k], S.wape_b[w0:k], connect="finite")
+        if done < w0:
+            self.t_wm.setText("")
+            self.t_wb.setText("")
+            self.k_acc.say(f"Warming up: scores start after {WARMUP_WEEKS * (2 if S.one else 1)} checked weeks", "")
+        elif k and np.isfinite(S.wape_m[done]) and np.isfinite(S.wape_b[done]):
             self.t_wm.setText(f"{100 * S.wape_m[done]:.1f}%")
             self.t_wm.setPos(self.x[done] + WEEK_S * 0.6, S.wape_m[done])
             self.t_wb.setText(f"{100 * S.wape_b[done]:.1f}%")
             self.t_wb.setPos(self.x[done] + WEEK_S * 0.6, S.wape_b[done])
             gap = S.wape_m[done] / S.wape_b[done] - 1
-            self.k_acc.say(f"Error so far {100 * S.wape_m[done]:.1f}% vs {100 * S.wape_b[done]:.1f}% for the "
-                           f"{self.base_label} ({100 * gap:+.0f}%).",
-                           "Error over every product-week checked so far (lower is better). Early weeks swing because "
-                           "few forecasts have been checked.")
+            self.k_acc.say(f"Model {100 * S.wape_m[done]:.1f}% vs {100 * S.wape_b[done]:.1f}% error ({100 * gap:+.0f}%)",
+                           f"Error (WAPE) over every product-week checked so far, lower is better. Drawn after a "
+                           f"warm-up, because the first few weeks swing wildly.")
         else:
             self.t_wm.setText("")
             self.t_wb.setText("")
@@ -842,15 +929,15 @@ class LivePage(QWidget):
         if done >= 0:
             wk = self.data.weeks[done]
             m_ = S.m[done]
-            fc = f"; the forecast said {m_:,.0f}" if np.isfinite(m_) else ""
-            self.k_stream.say(f"{self.scope_name}: {S.y[done]:,.0f} units sold in the week of {wk:%d %b %Y}{fc}.")
+            fc = f" · forecast {m_:,.0f}" if np.isfinite(m_) else ""
+            self.k_stream.say(f"{S.y[done]:,.0f} units sold in the week of {wk:%d %b}{fc}")
         else:
-            self.k_stream.say(f"{self.scope_name}: the first replay week is filling in.")
-        band_txt = ("light blue = the model's 80% range" if S.one
-                    else "light blue = 80% range for the total, from the misses seen so far")
-        self.k_stream.how.setText(f"Grey = sales as they arrive (the shaded strip is today's week filling in day by "
-                                  f"day). Blue = forecast; dots = forecasts already made for weeks still ahead; "
-                                  f"{band_txt}. Purple = LOWESS trend of the sales seen so far.")
+            self.k_stream.say("The first replay week is filling in")
+        band_txt = "the model's 80% range" if S.one else "an 80% range for the total, from the misses seen so far"
+        self.k_stream.say(self.k_stream.finding.text(),
+                          f"Grey: sales arriving day by day (the shaded strip is today's week). Blue: forecast; "
+                          f"dots are forecasts already made for weeks still ahead. Shaded blue: {band_txt}. "
+                          f"Purple: LOWESS trend (statsmodels) of the sales seen so far.")
 
         # race
         if done >= 0 and len(S.race_skus):
@@ -860,28 +947,30 @@ class LivePage(QWidget):
             self.race_target = {S.race_skus[i]: (float(vals[i]), r) for r, i in enumerate(order)}
             if order:
                 lead = S.race_skus[order[0]]
-                self.k_race.say(f"Leader: {self.data.names[lead]} with {vals[order[0]]:,.0f} units.",
+                self.k_race.say(f"{self.data.names[lead]} leads with {vals[order[0]]:,.0f} units",
                                 "Units sold since the replay started; bars glide as the order changes."
                                 + (" Blue = the selected product." if S.one else " Blue = the leader."))
         else:
             self.race_target = {}
-            self.k_race.say("The race starts with the first full week.", "")
+            self.k_race.say("The race starts with the first full week", "")
 
         # scatter
         old, new = sel[sel["widx"] < done], sel[sel["widx"] == done]
+        self.c_old.setSymbolSize(11 if S.one else 5)
+        self.c_new.setSymbolSize(15 if S.one else 8)
         self.c_old.setData(old["y"].to_numpy() + 1, old["m"].to_numpy() + 1)
         self.c_new.setData(new["y"].to_numpy() + 1, new["m"].to_numpy() + 1)
         pos = new[new["y"] > 0]
         if len(pos) == 1:
             r_ = pos.iloc[0]
-            self.k_sc.say(f"Latest week: {r_['y']:,.0f} sold, {r_['m']:,.0f} forecast ({r_['m'] / r_['y'] - 1:+.0%}).",
+            self.k_sc.say(f"Latest week: {r_['y']:,.0f} sold, {r_['m']:,.0f} forecast ({r_['m'] / r_['y'] - 1:+.0%})",
                           "Each dot is one week of this product (log scale). On the diagonal = exact. Orange = the latest week.")
         elif len(pos):
             within = float(((pos["m"] - pos["y"]).abs() <= 0.5 * pos["y"]).mean())
-            self.k_sc.say(f"Latest week: {within:.0%} of {len(pos)} selling products forecast within 50%.",
+            self.k_sc.say(f"{within:.0%} of {len(pos)} products within 50% this week",
                           "Each dot is one product-week (log scale). On the diagonal = exact. Orange = the latest week.")
         else:
-            self.k_sc.say("Dots appear as weeks are checked.", "")
+            self.k_sc.say("Dots appear as weeks are checked", "")
 
         # feed
         incremental = prev is not None and done == prev + 1
@@ -889,37 +978,60 @@ class LivePage(QWidget):
 
     # ---------------------------------------------------------------- feed
     def _feed(self, done: int, incremental: bool):
+        """Newest first. One row per product (one per week for a single product), with a running count."""
         S = self.S
         ev = S.events.assign(widx=S.ev_widx, az=S.events["z"].abs())
+        ev = ev[ev["widx"] <= done]
+        top = ev.sort_values(["widx", "az"]).groupby("widx").tail(4)
         if incremental:
-            add = ev[ev["widx"] == done].sort_values("az").tail(4)
+            add = top[top["widx"] == done]
         else:
             self.feed.clear()
             self.flash.clear()
-            add = ev[ev["widx"] <= done].sort_values(["widx", "az"]).groupby("widx").tail(4).tail(40)
+            self.feed_items, self.feed_counts = {}, {}
+            for k_ in (top["week"] if S.one else top["sku"]):
+                self.feed_counts[k_] = self.feed_counts.get(k_, 0) + 1
+            add = top.drop_duplicates("week" if S.one else "sku", keep="last").tail(40)
         for r in add.itertuples():
             self._feed_item(r, incremental)
-        while self.feed.count() > 60:
+        while self.feed.count() > 40:
             it = self.feed.takeItem(self.feed.count() - 1)
             self.flash.pop(id(it), None)
-        nflag = int((S.ev_widx <= done).sum()) if done >= 0 else 0
-        self.feed_count.setText(f"{nflag:,} flagged so far")
-        self.k_feed.say("Sales that broke out of the forecast range, newest first" if nflag else "No unusual weeks yet.",
-                        "Flagged when a product's sales fall outside its 80% range by at least 2 robust standard "
-                        "deviations of its earlier misses (median absolute deviation, scipy). Above the range = "
-                        "stock-out risk, below = overstock risk. Top 4 per week shown.")
+            self.feed_items.pop(it.data(Qt.ItemDataRole.UserRole + 2), None)
+        nflag = len(top)
+        self.feed_count.setText(f"{nflag:,} flagged")
+        self.k_feed.say("Sales that broke out of the forecast range" if nflag else "No unusual weeks yet",
+                        "A product-week is flagged when sales fall outside its 80% range by at least 2 robust "
+                        "standard deviations of its earlier misses (median absolute deviation, SciPy). Above the "
+                        "range = stock-out risk, below = overstock risk. Up to 4 per week.")
 
     def _feed_item(self, r, flash: bool):
-        t = self.themes[self.win.theme]
+        S = self.S
+        key = r.week if S.one else r.sku
+        if flash:
+            self.feed_counts[key] = self.feed_counts.get(key, 0) + 1
+        old = self.feed_items.pop(key, None)
+        if old is not None:
+            self.flash.pop(id(old), None)
+            self.feed.takeItem(self.feed.row(old))
         up = r.y > r.m
-        chg = f" ({r.y / r.m - 1:+.0%})" if r.m > 0 else ""
+        kind = "Stock-out risk" if up else "Overstock risk"
         name = self.data.names.get(r.sku, r.sku)
-        it = QListWidgetItem(dot_icon(t["bad"] if up else t["warn"]),
-                             f"{'Stock-out risk' if up else 'Overstock risk'}  ·  {name[:38]}\n"
-                             f"{r.week:%d %b %Y}  ·  sold {r.y:,.0f}, forecast {r.m:,.0f}{chg}  ·  score {r.z:+.1f}")
+        big = f"{r.y / r.m - 1:+.0%}" if r.m > 0 else "new"
+        n = self.feed_counts.get(key, 1)
+        d = dict(up=up, big=big,
+                 title=f"Week of {r.week:%d %b %Y}" if S.one else name,
+                 sub=f"{kind}  ·  {r.y:,.0f} sold vs {r.m:,.0f} forecast" if S.one else
+                     f"{kind}  ·  {r.week:%d %b}  ·  {r.y:,.0f} sold vs {r.m:,.0f}",
+                 small=f"{n} flags" if n > 1 and not S.one else f"score {abs(r.z):.1f}")
+        it = QListWidgetItem()
+        it.setData(Qt.ItemDataRole.UserRole, d)
+        it.setData(Qt.ItemDataRole.UserRole + 1, 1.0 if flash else 0.0)
+        it.setData(Qt.ItemDataRole.UserRole + 2, key)
         it.setToolTip(f"{name} ({r.sku}). Chance of a miss at least this large if the forecast were right: "
                       f"{r.p:.2%} (normal approximation).")
         self.feed.insertItem(0, it)
+        self.feed_items[key] = it
         if flash:
             self.flash[id(it)] = [it, 1.0]
 
@@ -928,18 +1040,18 @@ class LivePage(QWidget):
         for tl in self.tiles[1:]:
             tl.tk.step()
         # pulsing head on the live sales line
-        s = 16 + (10 * abs(np.sin(self.frame / 7.0)) if self.playing else 4)
+        s = 16 + (9 * abs(np.sin(self.frame / 16.0)) if self.playing else 4)
         self.halo.setSize(s)
         # flashing new feed rows
         if self.flash:
             t = self.themes[self.win.theme]
             for key, f in list(self.flash.items()):
-                f[1] *= 0.94
+                f[1] *= 0.975
                 if f[1] < 0.04:
-                    f[0].setBackground(QBrush())
+                    f[0].setData(Qt.ItemDataRole.UserRole + 1, 0.0)
                     del self.flash[key]
-                else:
-                    f[0].setBackground(qcolor(t["s1"], int(110 * f[1])))
+                elif self.frame % 3 == 0:
+                    f[0].setData(Qt.ItemDataRole.UserRole + 1, f[1])
         self._race_step()
 
     def _race_step(self):
@@ -951,15 +1063,15 @@ class LivePage(QWidget):
             ty = 7 - rank
             dv, dy = val - st[0], ty - st[1]
             if abs(dv) > 0.5 or abs(dy) > 0.01:
-                st[0] += 0.2 * dv
-                st[1] += 0.2 * dy
+                st[0] += 0.07 * dv
+                st[1] += 0.07 * dy
                 moving = True
             else:
                 st[0], st[1] = val, ty
         for sku in [k for k in self.race_state if k not in tgt]:
             st = self.race_state[sku]
-            st[0] *= 0.8
-            st[1] += 0.2 * (-1.6 - st[1])
+            st[0] *= 0.9
+            st[1] += 0.07 * (-1.6 - st[1])
             moving = True
             if st[0] < 1:
                 del self.race_state[sku]
@@ -967,9 +1079,9 @@ class LivePage(QWidget):
                 if txt is not None:
                     self.p_race.removeItem(txt)
         vmax = max([v for v, _ in tgt.values()] or [1.0])
-        goal = vmax * 2.05
+        goal = vmax * 2.45
         if abs(goal - self.race_xmax) > 1e-3 * goal:
-            self.race_xmax += 0.15 * (goal - self.race_xmax)
+            self.race_xmax += 0.05 * (goal - self.race_xmax)
             moving = True
         if not moving and getattr(self, "_race_still", False):
             return
@@ -986,7 +1098,7 @@ class LivePage(QWidget):
             txt = self.race_text.get(k)
             if txt is None:
                 txt = pg.TextItem(color=t["ink"], anchor=(0, 0.5))
-                txt.setFont(QFont("Segoe UI", 8))
+                txt.setFont(QFont(self.font().family(), 8))
                 self.p_race.addItem(txt)
                 self.race_text[k] = txt
             name = self.data.names.get(k, k)
@@ -1009,7 +1121,7 @@ class LivePage(QWidget):
 
     # ---------------------------------------------------------------- theme
     def apply_theme(self, t: dict):
-        font = QFont("Segoe UI", 8)
+        font = QFont(self.font().family(), 8)
         for w in (self.p_stream, self.p_acc, self.p_race, self.p_sc):
             w.setBackground(t["surface"])
             pi = w.getPlotItem()
@@ -1018,7 +1130,11 @@ class LivePage(QWidget):
                 ax.setPen(pg.mkPen(t["axis"]))
                 ax.setTextPen(pg.mkPen(t["ink2"]))
                 ax.setStyle(tickFont=font)
-            pi.showGrid(x=False, y=True, alpha=0.25)
+            pi.showGrid(x=False, y=True, alpha=0.18)
+            for name in ("left", "bottom"):
+                pi.getAxis(name).setPen(pg.mkPen(t["grid"]))
+                pi.getAxis(name).setTextPen(pg.mkPen(t["ink2"]))
+                pi.getAxis(name).label.setDefaultTextColor(QColor(t["muted"]))
         self.badge.set_colors(bg=t["tint"])
         self.l_day.set_colors(fg=t["ink"], bg=t["tint"])
         self.tiles[0].note.set_colors(fg=t["ink2"], bg=t["surface"])
@@ -1029,9 +1145,9 @@ class LivePage(QWidget):
             tl.curve.setFillLevel(None)
             tl.ref.setPen(pg.mkPen(t["muted"], width=1, style=Qt.PenStyle.DotLine))
         self.tiles[0].curve.setFillLevel(0)
-        self.tiles[0].curve.setBrush(qcolor(t["s1"], 50))
+        self.tiles[0].curve.setBrush(fade(t["s1"], 70))
         self.c_actual.setPen(pg.mkPen(t["actual"], width=2.2))
-        self.c_actual.setBrush(qcolor(t["actual"], 38))
+        self.c_actual.setBrush(fade(t["actual"], 80))
         self.c_trend.setPen(pg.mkPen(TREND, width=2, style=Qt.PenStyle.DashDotLine))
         self.c_fc_past.setPen(pg.mkPen(t["s1"], width=2.2))
         self.c_fc_ahead.setPen(pg.mkPen(t["s1"], width=2.4, style=Qt.PenStyle.DashLine))
@@ -1047,12 +1163,12 @@ class LivePage(QWidget):
         self.head.setPen(pg.mkPen(t["surface"], width=2))
         self.halo.setBrush(pg.mkBrush(qcolor(t["s1"], 70)))
         self.c_wm.setPen(pg.mkPen(t["s1"], width=2.4))
-        self.c_wm.setBrush(qcolor(t["s1"], 30))
+        self.c_wm.setBrush(fade(t["s1"], 60))
         self.c_wb.setPen(pg.mkPen(t["s2"], width=2, style=Qt.PenStyle.DashLine))
         self.t_wm.setColor(t["s1"])
         self.t_wb.setColor(t["s2"])
         self.c_diag.setPen(pg.mkPen(t["muted"], width=1.2, style=Qt.PenStyle.DashLine))
-        self.c_old.setSymbolBrush(qcolor(t["s1"], 70))
+        self.c_old.setSymbolBrush(qcolor(t["s1"], 95))
         self.c_old.setSymbolPen(pg.mkPen(None))
         self.c_new.setSymbolBrush(qcolor(t["s2"], 230))
         self.c_new.setSymbolPen(pg.mkPen(t["surface"], width=1))

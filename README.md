@@ -38,7 +38,8 @@ history, clearly labelled as such, not a live connection; every number is comput
   standard deviations of that product's earlier misses (median absolute deviation, scipy), newest first, marked as
   stock-out or overstock risk.
 - **Running accuracy, sales race and forecast-vs-actual scatter**, all animated as weeks are checked.
-- **Controls.** Play / pause, restart, speed 1x to 8x, a timeline slider, and a scope picker: all products, a
+- **Controls.** Play / pause, restart, speed 0.5x to 4x (at 1x a replayed week takes about 12 seconds, one day
+  every 1.7 seconds), a timeline slider, and a scope picker: all products, a
   revenue class, regular or intermittent sellers, or one searchable product. The top-bar filters and the forecast
   setting apply too. Light and dark mode.
 - **Performance.** pyqtgraph redraws only what changed; the ticking numbers are painted directly so they never
@@ -48,6 +49,23 @@ history, clearly labelled as such, not a live connection; every number is comput
 |---|---|
 | ![One product, dark](reports/screens/2b_live_replay_product_dark.png) | ![Class A, dark](reports/screens/2c_live_replay_class_a_dark.png) |
 
+## Design
+
+The whole app follows one small design system, built from current guidance on analytics dashboards (Fluent 2 and
+Microsoft data-visualisation guidance, WCAG 2.2 contrast rules, and the restrained style of tools such as Linear,
+Stripe and Vercel):
+
+- **Neutral surfaces, colour for meaning.** Blue is always the model and the selected state, orange the simple
+  method, grey the actual sales; green, red and amber are kept for good, bad and warning.
+- **Two matched themes.** Light and dark use the same hues; dark mode uses layered near-black surfaces (no pure
+  black) and slightly lighter, less saturated colours so nothing glows.
+- **One typeface.** Inter (bundled in `app/fonts`, SIL Open Font License) with hierarchy from size and weight.
+- **Quiet charts.** Thin, light gridlines, no chart borders, values labelled directly, gradient fills that fade to
+  the baseline, a single highlight per chart.
+- **Less text on screen.** Every card states one finding; the "how to read it" note sits behind the (i) icon.
+- **Cards and spacing.** Rounded 14 px cards with hairline borders instead of heavy shadows, an 8 / 16 / 24 px
+  spacing rhythm, a sidebar with line icons, grouped sections and a final-test snapshot.
+
 ## Tech stack
 
 | Area | Libraries |
@@ -55,7 +73,7 @@ history, clearly labelled as such, not a live connection; every number is comput
 | Data preparation | pandas, NumPy, PyArrow (Parquet), openpyxl |
 | Forecasting | LightGBM (gradient boosting), five baseline methods |
 | Statistics | statsmodels (LOWESS trend), SciPy (robust anomaly scores), scikit-learn (error and quantile-loss metrics) |
-| Desktop app | PyQt6, pyqtgraph (real-time charts), Matplotlib (static charts) |
+| Desktop app | PyQt6, pyqtgraph (real-time charts), Matplotlib (static charts), Inter typeface |
 | Testing | pytest (leakage tests) |
 
 ## How the test is kept honest

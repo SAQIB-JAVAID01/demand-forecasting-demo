@@ -12,9 +12,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont
-from PyQt6.QtWidgets import (QApplication, QButtonGroup, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QColor, QFont, QFontDatabase
+from PyQt6.QtWidgets import (QApplication, QButtonGroup, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
                              QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QPushButton, QScrollArea,
                              QSizePolicy, QStackedWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
@@ -25,91 +25,115 @@ from src.report import FEATURE_NAMES  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from brand import logo_icon, logo_pixmap, save_assets  # noqa: E402
 from charts import Chart  # noqa: E402
+from icons import icon  # noqa: E402
 from live import LivePage  # noqa: E402
 
 BASE = "ma13"                       # strongest simple method on the final test (the tougher comparison)
 BASE_LABEL = "13-week average"
 MODELS = {"gbm_log": "Best per-product accuracy", "gbm_tweedie": "Unbiased totals"}
 
+# Design tokens. Same hues in both modes; dark mode lifts lightness and lowers saturation so nothing glows.
+# Neutral surfaces carry 80% of the screen, one accent (blue) marks the model and the selected state,
+# orange is always the simple method, green / red / amber are reserved for good / bad / warning.
 THEMES = {
-    "light": dict(page="#f3f4f6", surface="#ffffff", ink="#0f172a", ink2="#475569", muted="#94a3b8",
-                  grid="#e5e7eb", axis="#cbd5e1", border="#e5e7eb", s1="#2a78d6", s2="#eb6834",
-                  actual="#475569", band="#cde2fb", neutral="#cbd5e1", chip="#eef0f3", nav="#0f1b2d",
-                  navink="#cbd5e1", navsel="#1d3557", good="#0a7d32", bad="#c0392b", warn="#b45309",
-                  sel="#e4eefb", tint="#f1f6fd", soft="#9ec5f4", track="#eef1f5"),
-    "dark": dict(page="#0b0f17", surface="#141a24", ink="#f1f5f9", ink2="#cbd5e1", muted="#7c8799",
-                 grid="#232b38", axis="#334155", border="#232b38", s1="#3987e5", s2="#d95926",
-                 actual="#cbd5e1", band="#104281", neutral="#3b4556", chip="#1e2633", nav="#070a10",
-                 navink="#94a3b8", navsel="#16233a", good="#34c36b", bad="#f07171", warn="#f5a524",
-                 sel="#17304f", tint="#111c2e", soft="#1c5cab", track="#1c2431"),
+    "light": dict(page="#f5f6f8", surface="#ffffff", raised="#fafbfc", ink="#0f172a", ink2="#475569", muted="#8a94a6",
+                  grid="#eef0f4", axis="#d6dbe3", border="#e4e7ec", s1="#2f6fed", s2="#f0883e", actual="#64748b",
+                  band="#d9e6fd", neutral="#d3d9e2", chip="#f0f2f5", nav="#0b1220", navink="#94a0b4",
+                  navsel="#18233a", navline="#1b2537", good="#139a52", bad="#e0464b", warn="#c97a06", sel="#e9f0fe",
+                  tint="#f3f7ff", soft="#a8c3fa", track="#f0f2f5"),
+    "dark": dict(page="#0b0e13", surface="#11151c", raised="#151a22", ink="#e6e8eb", ink2="#a3abb7", muted="#6e7887",
+                 grid="#1b212a", axis="#2a313c", border="#1f2630", s1="#5b8def", s2="#f0915a", actual="#c3cad4",
+                 band="#1a3560", neutral="#2b3441", chip="#1a2029", nav="#080a0f", navink="#8a94a3",
+                 navsel="#151c28", navline="#151a22", good="#3fcf8e", bad="#f2555a", warn="#f5a524", sel="#18243a",
+                 tint="#111a29", soft="#2e5bb8", track="#1a2029"),
 }
 
 
 def qss(t: dict) -> str:
     return f"""
-    QWidget {{ background: {t['page']}; color: {t['ink']}; font-family: 'Segoe UI'; font-size: 10.5pt; }}
+    QWidget {{ background: {t['page']}; color: {t['ink']}; font-family: 'Inter', 'Segoe UI'; font-size: 10pt; }}
+    QToolTip {{ background: {t['raised']}; color: {t['ink']}; border: 1px solid {t['border']}; padding: 6px 8px;
+                border-radius: 6px; }}
     QScrollArea {{ border: none; }}
-    #nav {{ background: {t['nav']}; }}
-    #nav QLabel {{ background: {t['nav']}; color: #ffffff; }}
-    #nav QLabel#navsub {{ color: {t['navink']}; font-size: 9pt; }}
-    #nav QLabel#navfoot {{ color: {t['navink']}; font-size: 8.5pt; }}
-    #nav QPushButton {{ background: transparent; color: {t['navink']}; text-align: left; padding: 11px 14px;
-                        border-radius: 8px; font-size: 10.5pt; }}
+    #nav {{ background: {t['nav']}; border-right: 1px solid {t['navline']}; }}
+    #nav QWidget {{ background: {t['nav']}; }}
+    #nav QLabel {{ color: #ffffff; }}
+    #nav QLabel#navsub {{ color: {t['navink']}; font-size: 8.5pt; }}
+    #nav QLabel#navsec {{ color: #5d6878; font-size: 7.5pt; font-weight: 600; letter-spacing: 1px; }}
+    #nav QLabel#navfoot {{ color: #5d6878; font-size: 7.5pt; }}
+    #nav QPushButton {{ background: transparent; color: {t['navink']}; text-align: left; padding: 8px 12px;
+                        border-radius: 8px; font-size: 9.8pt; font-weight: 500; }}
     #nav QPushButton:hover {{ background: {t['navsel']}; color: #ffffff; }}
-    #nav QPushButton:checked {{ background: {t['navsel']}; color: #ffffff; font-weight: 600;
-                                border-left: 3px solid {t['s1']}; }}
-    #topbar, #topbar QWidget {{ background: {t['surface']}; }}
+    #nav QPushButton:checked {{ background: {t['navsel']}; color: #ffffff; font-weight: 600; }}
+    QFrame#navcard, QFrame#navcard QWidget {{ background: #111a2b; }}
+    QFrame#navcard {{ border: 1px solid #1d2840; border-radius: 12px; }}
+    QFrame#navcard QLabel {{ color: #c8d1df; font-size: 8.5pt; }}
+    QFrame#navcard QLabel#navval {{ color: #ffffff; font-weight: 600; }}
+    QFrame#navcard QLabel#navsec {{ color: #6f7c90; }}
+    #topbar, #topbar QWidget {{ background: {t['page']}; }}
     #topbar {{ border-bottom: 1px solid {t['border']}; }}
-    QFrame#card {{ background: {t['surface']}; border: 1px solid {t['border']}; border-radius: 12px; }}
+    QFrame#card {{ background: {t['surface']}; border: 1px solid {t['border']}; border-radius: 14px; }}
     QFrame#card QWidget {{ background: {t['surface']}; }}
-    QFrame#hero {{ background: {t['tint']}; border: 1px solid {t['border']}; border-left: 5px solid {t['s1']};
-                   border-radius: 12px; }}
-    QFrame#hero QWidget {{ background: {t['tint']}; }}
+    QFrame#hero {{ border: 1px solid {t['border']}; border-radius: 14px;
+                   background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {t['tint']}, stop:1 {t['surface']}); }}
+    QFrame#hero QWidget {{ background: transparent; }}
+    QFrame#hero QComboBox, QFrame#hero QLineEdit {{ background: {t['surface']}; }}
+    QFrame#hero QAbstractItemView, QFrame#hero QListView {{ background: {t['raised']}; color: {t['ink']}; }}
     QFrame#hero QPushButton {{ background: {t['surface']}; color: {t['ink']}; border: 1px solid {t['border']}; }}
     QFrame#hero QPushButton:hover {{ background: {t['chip']}; }}
-    QFrame#hero QPushButton:checked {{ background: {t['ink']}; color: {t['surface']}; }}
+    QFrame#hero QPushButton:checked {{ background: {t['ink']}; color: {t['surface']}; border-color: {t['ink']}; }}
     QFrame#hero QPushButton#primary {{ background: {t['s1']}; color: #ffffff; font-weight: 600; border: none; }}
-    QSlider::groove:horizontal {{ height: 6px; background: {t['grid']}; border-radius: 3px; }}
-    QSlider::sub-page:horizontal {{ background: {t['s1']}; border-radius: 3px; }}
-    QSlider::handle:horizontal {{ background: {t['s1']}; width: 16px; margin: -5px 0; border-radius: 8px; }}
-    QLabel#title {{ font-size: 16pt; font-weight: 700; }}
-    QLabel#sub {{ color: {t['ink2']}; }}
-    QLabel#flabel {{ color: {t['muted']}; font-size: 8.5pt; font-weight: 600; }}
-    QLabel#hero1 {{ font-size: 14pt; font-weight: 600; }}
-    QLabel#hero2 {{ color: {t['ink2']}; font-size: 10.5pt; }}
-    QLabel#kv {{ font-size: 23pt; font-weight: 700; }}
-    QWidget#kv {{ font-size: 23pt; font-weight: 700; }}
-    QWidget#badge {{ font-size: 9pt; font-weight: 700; }}
-    QWidget#kn {{ font-size: 9.5pt; }}
-    QWidget#kl {{ font-weight: 600; }}
-    QLabel#kl {{ color: {t['ink']}; font-weight: 600; }}
-    QLabel#kn {{ color: {t['ink2']}; font-size: 9.5pt; }}
-    QLabel#eyebrow {{ color: {t['s1']}; font-size: 8.5pt; font-weight: 700; }}
-    QLabel#h2 {{ font-size: 12pt; font-weight: 700; }}
-    QLabel#cap {{ color: {t['ink2']}; font-size: 9.5pt; }}
-    QLabel#body {{ color: {t['ink2']}; font-size: 10.5pt; }}
-    QPushButton {{ background: {t['chip']}; color: {t['ink']}; border: none; border-radius: 8px; padding: 6px 13px; }}
+    QSlider {{ background: transparent; }}
+    QSlider::groove:horizontal {{ height: 4px; background: {t['grid']}; border-radius: 2px; }}
+    QSlider::sub-page:horizontal {{ background: {t['s1']}; border-radius: 2px; }}
+    QSlider::handle:horizontal {{ background: #ffffff; border: 2px solid {t['s1']}; width: 12px; margin: -6px 0;
+                                  border-radius: 8px; }}
+    QLabel#title {{ font-size: 17pt; font-weight: 700; }}
+    QLabel#sub {{ color: {t['ink2']}; font-size: 9.5pt; }}
+    QLabel#flabel {{ color: {t['muted']}; font-size: 7.5pt; font-weight: 600; letter-spacing: 1px; }}
+    QLabel#hero1 {{ font-size: 13.5pt; font-weight: 600; background: transparent; }}
+    QLabel#hero2 {{ color: {t['ink2']}; font-size: 9.8pt; background: transparent; }}
+    QLabel#kv, QWidget#kv {{ font-size: 22pt; font-weight: 600; }}
+    QWidget#badge {{ font-size: 8pt; font-weight: 700; }}
+    QLabel#kl, QWidget#kl {{ color: {t['ink2']}; font-size: 8.8pt; font-weight: 500; }}
+    QLabel#kn, QWidget#kn {{ color: {t['muted']}; font-size: 8.8pt; }}
+    QLabel#eyebrow {{ color: {t['muted']}; font-size: 7.5pt; font-weight: 600; letter-spacing: 1px; }}
+    QLabel#info {{ color: {t['muted']}; font-size: 10pt; }}
+    QLabel#h2 {{ font-size: 11.5pt; font-weight: 600; }}
+    QLabel#cap {{ color: {t['muted']}; font-size: 8.8pt; }}
+    QLabel#body {{ color: {t['ink2']}; font-size: 10pt; }}
+    QPushButton {{ background: {t['chip']}; color: {t['ink']}; border: 1px solid transparent; border-radius: 8px;
+                   padding: 5px 12px; font-weight: 500; }}
     QPushButton:hover {{ background: {t['grid']}; }}
-    #topbar QPushButton, QFrame#card QPushButton {{ background: {t['chip']}; color: {t['ink']}; }}
-    #topbar QPushButton:checked {{ background: {t['ink']}; color: {t['surface']}; }}
-    #topbar QPushButton#seg:checked {{ background: {t['s1']}; color: #ffffff; }}
-    QFrame#card QPushButton#primary {{ background: {t['s1']}; color: #ffffff; font-weight: 600; padding: 7px 16px; }}
-    QLineEdit {{ background: {t['surface']}; border: 1px solid {t['border']}; border-radius: 8px; padding: 7px 10px; }}
-    QListWidget {{ background: {t['surface']}; border: 1px solid {t['border']}; border-radius: 8px; outline: none; }}
-    QListWidget::item {{ padding: 6px 8px; border-radius: 6px; }}
-    QListWidget::item:selected {{ background: {t['sel']}; color: {t['ink']}; }}
-    QTableWidget {{ background: {t['surface']}; border: none; alternate-background-color: {t['page']}; }}
-    QTableWidget::item:selected {{ background: {t['sel']}; color: {t['ink']}; }}
-    QHeaderView::section {{ background: {t['surface']}; color: {t['ink2']}; border: none;
-                            border-bottom: 1px solid {t['grid']}; padding: 7px; font-weight: 600; }}
+    #topbar QPushButton {{ background: {t['surface']}; color: {t['ink2']}; border: 1px solid {t['border']};
+                           border-radius: 14px; padding: 4px 12px; font-size: 9pt; }}
+    #topbar QPushButton:hover {{ color: {t['ink']}; }}
+    #topbar QPushButton:checked {{ background: {t['sel']}; color: {t['s1']}; border-color: {t['soft']}; font-weight: 600; }}
+    #topbar QPushButton#seg:checked {{ background: {t['s1']}; color: #ffffff; border-color: {t['s1']}; }}
+    QFrame#card QPushButton {{ background: {t['chip']}; color: {t['ink']}; }}
+    QFrame#card QPushButton#primary {{ background: {t['s1']}; color: #ffffff; font-weight: 600; padding: 6px 16px; }}
+    QLineEdit {{ background: {t['surface']}; border: 1px solid {t['border']}; border-radius: 8px; padding: 6px 10px; }}
+    QLineEdit:focus {{ border-color: {t['s1']}; }}
     QComboBox {{ background: {t['surface']}; color: {t['ink']}; border: 1px solid {t['border']}; border-radius: 8px;
-                 padding: 5px 10px; }}
-    QComboBox QAbstractItemView {{ background: {t['surface']}; color: {t['ink']}; selection-background-color: {t['sel']};
-                                   selection-color: {t['ink']}; }}
-    QFrame#hero QComboBox, QFrame#hero QLineEdit {{ background: {t['surface']}; }}
-    QScrollBar:vertical {{ background: transparent; width: 10px; }}
-    QScrollBar::handle:vertical {{ background: {t['axis']}; border-radius: 5px; min-height: 30px; }}
-    QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
+                 padding: 4px 10px; }}
+    QComboBox QAbstractItemView {{ background: {t['raised']}; color: {t['ink']}; selection-background-color: {t['sel']};
+                                   selection-color: {t['ink']}; border: 1px solid {t['border']}; }}
+    QListWidget {{ background: {t['surface']}; border: none; outline: none; }}
+    QListWidget::item {{ padding: 6px 8px; border-radius: 8px; }}
+    QListWidget::item:hover {{ background: {t['raised']}; }}
+    QListWidget::item:selected {{ background: {t['sel']}; color: {t['ink']}; }}
+    QTableWidget {{ background: {t['surface']}; border: none; alternate-background-color: {t['raised']};
+                    gridline-color: {t['grid']}; }}
+    QTableWidget::item {{ padding: 4px; }}
+    QTableWidget::item:selected {{ background: {t['sel']}; color: {t['ink']}; }}
+    QHeaderView::section {{ background: {t['surface']}; color: {t['muted']}; border: none;
+                            border-bottom: 1px solid {t['border']}; padding: 8px 6px; font-size: 8.5pt; font-weight: 600; }}
+    QScrollBar:vertical {{ background: transparent; width: 8px; margin: 2px; }}
+    QScrollBar::handle:vertical {{ background: {t['axis']}; border-radius: 4px; min-height: 30px; }}
+    QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; width: 0; }}
+    QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
+    QScrollBar:horizontal {{ background: transparent; height: 8px; margin: 2px; }}
+    QScrollBar::handle:horizontal {{ background: {t['axis']}; border-radius: 4px; min-width: 30px; }}
     """
 
 
@@ -130,16 +154,27 @@ def label(text: str = "", name: str = "", wrap: bool = False) -> QLabel:
 
 
 class Card(QFrame):
-    """A card: category line, a plain-language finding, optional chart or text, and how to read it."""
+    """A card: category line, a short plain-language finding, an optional chart or text.
+
+    The "how to read it" note lives in the (i) tooltip next to the category, which keeps the screen calm.
+    """
 
     def __init__(self, eyebrow: str, chart_height: int = 0, text: bool = False):
         super().__init__()
         self.setObjectName("card")
         self.lay = QVBoxLayout(self)
-        self.lay.setContentsMargins(18, 15, 18, 15)
-        self.lay.setSpacing(5)
+        self.lay.setContentsMargins(20, 16, 20, 16)
+        self.lay.setSpacing(6)
+        head = QHBoxLayout()
+        head.setSpacing(6)
+        head.addWidget(label(eyebrow.upper(), "eyebrow"))
+        self.info = label("ⓘ", "info")
+        self.info.setCursor(Qt.CursorShape.WhatsThisCursor)
+        head.addWidget(self.info)
+        head.addStretch(1)
+        self.head = head
+        self.lay.addLayout(head)
         self.finding = label("", "h2", True)
-        self.lay.addWidget(label(eyebrow.upper(), "eyebrow"))
         self.lay.addWidget(self.finding)
         self.chart = self.body = None
         if chart_height:
@@ -150,13 +185,14 @@ class Card(QFrame):
             self.body.setTextFormat(Qt.TextFormat.RichText)
             self.body.setAlignment(Qt.AlignmentFlag.AlignTop)
             self.lay.addWidget(self.body, 1)
-        self.how = label("", "cap", True)
-        self.lay.addWidget(self.how)
+        self.how = label("", "cap", True)        # kept for callers; the text is shown as a tooltip
+        self.how.hide()
 
     def say(self, finding: str, how: str = ""):
         self.finding.setText(finding)
         self.how.setText(how)
-        self.how.setVisible(bool(how))
+        self.info.setToolTip(f"<div style='max-width:340px'>{how}</div>" if how else "")
+        self.info.setVisible(bool(how))
 
 
 class NumItem(QTableWidgetItem):
@@ -215,8 +251,8 @@ class Window(QMainWindow):
         area.setWidgetResizable(True)
         inner = QWidget()
         lay = QVBoxLayout(inner)
-        lay.setContentsMargins(24, 18, 24, 24)
-        lay.setSpacing(14)
+        lay.setContentsMargins(28, 22, 28, 28)
+        lay.setSpacing(16)
         area.setWidget(inner)
         self.stack.addWidget(area)
         return lay
@@ -224,7 +260,7 @@ class Window(QMainWindow):
     @staticmethod
     def _row(lay, *widgets, stretch=None, weight: int = 0):
         row = QHBoxLayout()
-        row.setSpacing(14)
+        row.setSpacing(16)
         for i, w in enumerate(widgets):
             row.addWidget(w, stretch[i] if stretch else 1)
         lay.addLayout(row, weight)
@@ -252,38 +288,66 @@ class Window(QMainWindow):
 
         nav = QFrame()
         nav.setObjectName("nav")
-        nav.setFixedWidth(232)
+        nav.setFixedWidth(244)
         n = QVBoxLayout(nav)
-        n.setContentsMargins(14, 20, 14, 16)
-        n.setSpacing(4)
+        n.setContentsMargins(16, 22, 16, 18)
+        n.setSpacing(3)
         head = QHBoxLayout()
         head.setSpacing(11)
         mark = QLabel()
-        mark.setPixmap(logo_pixmap(132))
+        mark.setPixmap(logo_pixmap(120))
         mark.setScaledContents(True)
-        mark.setFixedSize(44, 44)
+        mark.setFixedSize(38, 38)
         head.addWidget(mark)
-        brand = label("Demand\nForecasting Studio")
-        brand.setStyleSheet("font-size: 12pt; font-weight: 700;")
+        brand = label("Demand Forecasting\nStudio")
+        brand.setStyleSheet("font-size: 11pt; font-weight: 700;")
         head.addWidget(brand, 1)
         n.addLayout(head)
-        n.addSpacing(6)
+        n.addSpacing(4)
         n.addWidget(label("UK online retailer · 200 products", "navsub"))
-        n.addSpacing(18)
+        n.addSpacing(16)
         self.nav_group = QButtonGroup(self)
+        self.nav_buttons = []
+        sections = {0: "OVERVIEW", 2: "ANALYSIS", 6: "METHOD"}
         for i, (name, _) in enumerate(PAGES):
+            if i in sections:
+                if i:
+                    n.addSpacing(10)
+                n.addWidget(label(sections[i], "navsec"))
+                n.addSpacing(2)
             b = QPushButton(name)
             b.setCheckable(True)
             b.setChecked(i == 0)
+            b.setIconSize(QSize(17, 17))
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.clicked.connect(lambda _=False, k=i: self.go(k))
             self.nav_group.addButton(b, i)
+            self.nav_buttons.append(b)
             n.addWidget(b)
         n.addStretch(1)
+        snap = QFrame()
+        snap.setObjectName("navcard")
+        sl = QGridLayout(snap)
+        sl.setContentsMargins(14, 12, 14, 12)
+        sl.setHorizontalSpacing(8)
+        sl.setVerticalSpacing(7)
+        sl.addWidget(label("FINAL TEST SNAPSHOT", "navsec"), 0, 0, 1, 2)
+        self.snap = []
+        for r_, text in enumerate(("Forecast error", "vs 13-week average", "Products improved", "Inside 80% range"), 1):
+            v = label("", "navval")
+            v.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            sl.addWidget(label(text), r_, 0)
+            sl.addWidget(v, r_, 1)
+            self.snap.append(v)
+        n.addWidget(snap)
+        n.addSpacing(10)
         self.b_theme = QPushButton("Dark mode")
+        self.b_theme.setIconSize(QSize(17, 17))
+        self.b_theme.setCursor(Qt.CursorShape.PointingHandCursor)
         self.b_theme.clicked.connect(self.toggle_theme)
         n.addWidget(self.b_theme)
-        n.addSpacing(6)
-        n.addWidget(label("Public data: UCI Online Retail II\nPython · pandas · LightGBM · PyQt6\npyqtgraph · statsmodels\nscipy · scikit-learn", "navfoot"))
+        n.addSpacing(8)
+        n.addWidget(label("Public data · UCI Online Retail II", "navfoot"))
         outer.addWidget(nav)
 
         right = QWidget()
@@ -293,12 +357,12 @@ class Window(QMainWindow):
         top = QFrame()
         top.setObjectName("topbar")
         tl = QVBoxLayout(top)
-        tl.setContentsMargins(24, 14, 24, 12)
-        tl.setSpacing(6)
+        tl.setContentsMargins(28, 18, 28, 14)
+        tl.setSpacing(4)
         self.title, self.subtitle = label("", "title"), label("", "sub")
         tl.addWidget(self.title)
         tl.addWidget(self.subtitle)
-        tl.addSpacing(4)
+        tl.addSpacing(8)
         bar = QHBoxLayout()
         bar.setSpacing(6)
         bar.addWidget(label("FORECAST SETTING", "flabel"))
@@ -330,7 +394,7 @@ class Window(QMainWindow):
         hero = QFrame()
         hero.setObjectName("hero")
         hl = QVBoxLayout(hero)
-        hl.setContentsMargins(20, 16, 20, 16)
+        hl.setContentsMargins(24, 20, 24, 20)
         hl.setSpacing(6)
         self.hero1, self.hero2 = label("", "hero1", True), label("", "hero2", True)
         hl.addWidget(self.hero1)
@@ -338,13 +402,13 @@ class Window(QMainWindow):
         lay.addWidget(hero)
         self.k = []
         krow = QHBoxLayout()
-        krow.setSpacing(14)
+        krow.setSpacing(16)
         for title in ("Forecast error", "Against the best simple method", "Forecast level", "Range reliability"):
             f = QFrame()
             f.setObjectName("card")
             l = QVBoxLayout(f)
-            l.setContentsMargins(18, 14, 18, 14)
-            l.setSpacing(2)
+            l.setContentsMargins(20, 16, 20, 16)
+            l.setSpacing(4)
             val, note = label("", "kv"), label("", "kn", True)
             l.addWidget(label(title, "kl"))
             l.addWidget(val)
@@ -375,7 +439,7 @@ class Window(QMainWindow):
         self.ptable = make_table(420)
         self.ptable.cellDoubleClicked.connect(self.open_from_table)
         self.p_tab.lay.insertWidget(2, self.ptable, 1)
-        self._row(lay, self.p_scatter, self.p_tab, stretch=(4, 7), weight=1)
+        self._row(lay, self.p_scatter, self.p_tab, stretch=(5, 7), weight=1)
 
         # ----- 4 explorer -----
         lay = self._page()
@@ -507,6 +571,7 @@ class Window(QMainWindow):
         self.hero2.setText(f"{h2}  Based on {len(fin):,} weekly forecasts for {fin['sku'].nunique()} products, "
                            f"{self.final_start:%d %b %Y} to {self.final_end:%d %b %Y}: a period never used to build or tune the model.")
 
+        sv_ = [pct(wm), spct(ch), None, pct(cov, 0)]
         self.k[0][0].setText(pct(wm))
         self.k[0][1].setText(f"Off by about {100 * wm:.0f} units for every 100 sold, per product and week.")
         self.k[1][0].setText(spct(ch))
@@ -548,6 +613,9 @@ class Window(QMainWindow):
             "wm": self.wape(d, mdl) if d["y"].sum() > 0 else np.nan,
             "wb": self.wape(d, BASE) if d["y"].sum() > 0 else np.nan}), include_groups=False).dropna()
         share = float((ps["wm"] < ps["wb"]).mean())
+        sv_[2] = pct(share, 0)
+        for lab_, v_ in zip(self.snap, sv_):
+            lab_.setText(v_)
         other = "gbm_tweedie" if mdl == "gbm_log" else "gbm_log"
         self.s_take.say("Three things to take away")
         self.s_take.body.setText(
@@ -798,7 +866,11 @@ class Window(QMainWindow):
     def apply_theme(self):
         self.setStyleSheet(qss(THEMES[self.theme]))
         self.live.apply_theme(THEMES[self.theme])
+        t = THEMES[self.theme]
         self.b_theme.setText("Light mode" if self.theme == "dark" else "Dark mode")
+        self.b_theme.setIcon(icon("sun" if self.theme == "dark" else "moon", t["navink"], "#ffffff"))
+        for b, kind in zip(self.nav_buttons, ("summary", "live", "accuracy", "products", "explorer", "risk", "method")):
+            b.setIcon(icon(kind, t["navink"], "#ffffff"))
         self.render_static()
         self.refresh()
         self.go(self.stack.currentIndex())
@@ -835,9 +907,20 @@ def live_shots(w, app, out: Path):
         w.toggle_theme()
 
 
+def load_fonts() -> str:
+    """Register the bundled Inter font (SIL Open Font License, see app/fonts/OFL.txt)."""
+    fams = set()
+    for f in sorted((Path(__file__).resolve().parent / "fonts").glob("*.ttf")):
+        fid = QFontDatabase.addApplicationFont(str(f))
+        fams.update(QFontDatabase.applicationFontFamilies(fid))
+    return "Inter" if "Inter" in fams else "Segoe UI"
+
+
 def main():
     app = QApplication(sys.argv)
-    app.setFont(QFont("Segoe UI", 10))
+    font = QFont(load_fonts(), 10)
+    font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+    app.setFont(font)
     app.setWindowIcon(logo_icon())
     w = Window()
     if "--screenshot" in sys.argv:           # produce portfolio images without clicking through the app
@@ -845,21 +928,23 @@ def main():
         from catalog import full_page
         w.show()
         app.processEvents()
-        for i, (name, _) in enumerate(PAGES):
-            w.go(i)
-            if name == "Live replay":
-                w.live.snapshot(40.55)
-            app.processEvents()
-            full_page(w).save(str(out / f"{i + 1}_{name.lower().replace(' ', '_')}.png"))
+        for theme in ("light", "dark"):
+            if w.theme != theme:
+                w.toggle_theme()
+            for i, (name, _) in enumerate(PAGES):
+                w.go(i)
+                if name == "Live replay":
+                    w.live.snapshot(40.55)
+                app.processEvents()
+                app.processEvents()
+                suffix = "" if theme == "light" else "_dark"
+                full_page(w).save(str(out / f"{i + 1}_{name.lower().replace(' ', '_')}{suffix}.png"))
+        w.toggle_theme()
         w.b_model[1].click()
         w.go(0)
         app.processEvents()
-        full_page(w).save(str(out / "7_summary_unbiased_totals.png"))
+        full_page(w).save(str(out / "1b_summary_unbiased_totals.png"))
         w.b_model[0].click()
-        w.toggle_theme()
-        w.go(0)
-        app.processEvents()
-        full_page(w).save(str(out / "8_executive_summary_dark.png"))
         live_shots(w, app, out)
         return
     if "--live-shots" in sys.argv:           # only the real-time page, light and dark
