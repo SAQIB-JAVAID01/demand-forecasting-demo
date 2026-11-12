@@ -1,0 +1,451 @@
+{
+  "data": {
+    "raw_rows": 1067371,
+    "rows_dropped_sheet_overlap": 22523,
+    "cancellation_rows": 19165,
+    "cancellations_matched_to_a_sale": 6430,
+    "units_removed_as_cancelled_sales": 407272,
+    "rows_dropped_nonpositive_qty_or_price": 6027,
+    "rows_dropped_non_product_codes": 4537,
+    "clean_rows": 1008689,
+    "clean_units": 10814934,
+    "date_min": "2009-12-01",
+    "date_max": "2011-12-09",
+    "skus_total": 4668,
+    "skus_eligible_first_year": 1740,
+    "skus_selected": 200,
+    "selected_share_of_first_year_revenue": 0.4221,
+    "weeks": 104,
+    "week_first": "2009-12-07",
+    "week_last": "2011-11-28",
+    "closed_weeks": [
+      "2009-12-28",
+      "2010-12-27"
+    ],
+    "panel_rows": 20255,
+    "panel_zero_share": 0.0784
+  },
+  "design": {
+    "folds_total": 13,
+    "folds_selection": 5,
+    "folds_final": 8,
+    "horizon_weeks": 4,
+    "final_first_week": "2011-04-25",
+    "final_last_week": "2011-11-28",
+    "final_rows_scored": 6400,
+    "final_units": 930745.0,
+    "closed_rows_excluded": 200
+  },
+  "chosen_model": "gbm_log",
+  "chosen_model_label": "Gradient boosting (log target)",
+  "best_baseline": "ma4",
+  "best_baseline_label": "4-week average",
+  "best_baseline_on_final_folds": "ma13",
+  "best_baseline_on_final_folds_label": "13-week average",
+  "selection_scores": [
+    {
+      "model": "naive",
+      "label": "Last week's sales",
+      "wape": 0.8344037504398975,
+      "bias": -0.10268672598997872,
+      "mae": 104.82394736842106
+    },
+    {
+      "model": "ma4",
+      "label": "4-week average",
+      "wape": 0.7336562390025639,
+      "bias": 0.11259332109999497,
+      "mae": 92.16730263157895
+    },
+    {
+      "model": "ma13",
+      "label": "13-week average",
+      "wape": 0.844689616100053,
+      "bias": 0.29023804735810166,
+      "mae": 106.11613360323886
+    },
+    {
+      "model": "snaive",
+      "label": "Same week last year",
+      "wape": 0.9083033784123473,
+      "bias": 0.20855642417843917,
+      "mae": 114.10776315789474
+    },
+    {
+      "model": "ses",
+      "label": "Exponential smoothing",
+      "wape": 0.7694137145076285,
+      "bias": 0.2540927171425761,
+      "mae": 96.65942018066046
+    },
+    {
+      "model": "gbm_tweedie",
+      "label": "Gradient boosting (Tweedie)",
+      "wape": 0.717845592002232,
+      "bias": 0.13931547691228943,
+      "mae": 90.18105265589303
+    },
+    {
+      "model": "gbm_l1",
+      "label": "Gradient boosting (L1)",
+      "wape": 0.6462748094123217,
+      "bias": -0.0343946918198695,
+      "mae": 81.18980358328731
+    },
+    {
+      "model": "gbm_log",
+      "label": "Gradient boosting (log target)",
+      "wape": 0.6297834577777848,
+      "bias": -0.1726842618691722,
+      "mae": 79.11803847573422
+    }
+  ],
+  "final_scores": [
+    {
+      "model": "naive",
+      "label": "Last week's sales",
+      "wape": 0.7426190847117095,
+      "bias": 0.004807976405997346,
+      "mae": 107.99828125,
+      "weekly_total_wape": 0.22198453926693132,
+      "chosen": false,
+      "best_baseline_on_selection": false
+    },
+    {
+      "model": "ma4",
+      "label": "4-week average",
+      "wape": 0.5973284841712821,
+      "bias": -0.051987386448490186,
+      "mae": 86.868828125,
+      "weekly_total_wape": 0.20203385460034703,
+      "chosen": false,
+      "best_baseline_on_selection": true
+    },
+    {
+      "model": "ma13",
+      "label": "13-week average",
+      "wape": 0.5837812306684017,
+      "bias": -0.08844800505137118,
+      "mae": 84.89866586538461,
+      "weekly_total_wape": 0.19261385730289673,
+      "chosen": false,
+      "best_baseline_on_selection": false
+    },
+    {
+      "model": "snaive",
+      "label": "Same week last year",
+      "wape": 0.8910517918441678,
+      "bias": 0.28466980751978255,
+      "mae": 129.5846875,
+      "weekly_total_wape": 0.3265034998845011,
+      "chosen": false,
+      "best_baseline_on_selection": false
+    },
+    {
+      "model": "ses",
+      "label": "Exponential smoothing",
+      "wape": 0.5864252676765567,
+      "bias": -0.024420511905665375,
+      "mae": 85.28318527556512,
+      "weekly_total_wape": 0.17997557076263476,
+      "chosen": false,
+      "best_baseline_on_selection": false
+    },
+    {
+      "model": "gbm_tweedie",
+      "label": "Gradient boosting (Tweedie)",
+      "wape": 0.5769486145772463,
+      "bias": -0.021349218818164928,
+      "mae": 83.90500598042173,
+      "weekly_total_wape": 0.18561504570510118,
+      "chosen": false,
+      "best_baseline_on_selection": false
+    },
+    {
+      "model": "gbm_l1",
+      "label": "Gradient boosting (L1)",
+      "wape": 0.5361693055933464,
+      "bias": -0.20727361174052958,
+      "mae": 77.97451567726237,
+      "weekly_total_wape": 0.2508112392485395,
+      "chosen": false,
+      "best_baseline_on_selection": false
+    },
+    {
+      "model": "gbm_log",
+      "label": "Gradient boosting (log target)",
+      "wape": 0.5401084119298547,
+      "bias": -0.24572510178861032,
+      "mae": 78.54737560338323,
+      "weekly_total_wape": 0.2750377521924286,
+      "chosen": true,
+      "best_baseline_on_selection": false
+    }
+  ],
+  "vs_best_baseline": {
+    "diff": -0.057220072241427444,
+    "ci95": [
+      -0.0753474188524232,
+      -0.03927983652280431
+    ],
+    "relative_change": -0.09579330930587215,
+    "relative_ci95": [
+      -0.12188147142021424,
+      -0.06796061036990114
+    ],
+    "share_of_resamples_model_better": 1.0
+  },
+  "vs_best_baseline_on_final_folds": {
+    "diff": -0.043672818738547003,
+    "ci95": [
+      -0.05979994931104238,
+      -0.03026299031164012
+    ],
+    "relative_change": -0.07481024816187332,
+    "relative_ci95": [
+      -0.09801258820763231,
+      -0.05368107202048589
+    ],
+    "share_of_resamples_model_better": 1.0
+  },
+  "vs_naive": {
+    "diff": -0.20251067278185475,
+    "ci95": [
+      -0.24347414024415293,
+      -0.16468999645160584
+    ],
+    "relative_change": -0.2726979106125059,
+    "relative_ci95": [
+      -0.3079575721385822,
+      -0.2337450922890656
+    ],
+    "share_of_resamples_model_better": 1.0
+  },
+  "products_where_model_beats_baseline": 0.7743589743589744,
+  "segments": {
+    "horizon": [
+      {
+        "h": 1,
+        "rows": 1600,
+        "units": 221845.0,
+        "wape_model": 0.535666653138121,
+        "wape_baseline": 0.6144132164348982,
+        "bias_model": -0.22878124202092878,
+        "relative_change": -0.12816547754896968
+      },
+      {
+        "h": 2,
+        "rows": 1600,
+        "units": 221721.0,
+        "wape_model": 0.5080839141685483,
+        "wape_baseline": 0.5809102430532065,
+        "bias_model": -0.17714919174285956,
+        "relative_change": -0.12536588871611265
+      },
+      {
+        "h": 3,
+        "rows": 1600,
+        "units": 242189.0,
+        "wape_model": 0.5581744039691193,
+        "wape_baseline": 0.5928510378258303,
+        "bias_model": -0.2806518426522382,
+        "relative_change": -0.05849131003275454
+      },
+      {
+        "h": 4,
+        "rows": 1600,
+        "units": 244990.0,
+        "wape_model": 0.5552539325686128,
+        "wape_baseline": 0.6011429037919915,
+        "bias_model": -0.2886034130600666,
+        "relative_change": -0.07633621046495354
+      }
+    ],
+    "abc": [
+      {
+        "abc": "A",
+        "rows": 1280,
+        "units": 336602.0,
+        "wape_model": 0.514222060210274,
+        "wape_baseline": 0.5464569432148353,
+        "bias_model": -0.28542280586941404,
+        "relative_change": -0.0589888799196544
+      },
+      {
+        "abc": "B",
+        "rows": 1920,
+        "units": 283891.0,
+        "wape_model": 0.5485635942681456,
+        "wape_baseline": 0.613839466555826,
+        "bias_model": -0.25909663319314974,
+        "relative_change": -0.10634029879821005
+      },
+      {
+        "abc": "C",
+        "rows": 3200,
+        "units": 310252.0,
+        "wape_model": 0.5604565405231099,
+        "wape_baseline": 0.6374124904916004,
+        "bias_model": -0.19042043329018724,
+        "relative_change": -0.12073178846736865
+      }
+    ],
+    "demand_type": [
+      {
+        "demand_type": "intermittent",
+        "rows": 1280,
+        "units": 138009.0,
+        "wape_model": 0.5860818087558659,
+        "wape_baseline": 0.6105217775652313,
+        "bias_model": -0.34169226917660445,
+        "relative_change": -0.04003128095910402
+      },
+      {
+        "demand_type": "regular",
+        "rows": 5120,
+        "units": 792736.0,
+        "wape_model": 0.5321048110809454,
+        "wape_baseline": 0.5950316372663788,
+        "bias_model": -0.22901798516460223,
+        "relative_change": -0.10575374861498799
+      }
+    ],
+    "season": [
+      {
+        "season": "Dec-Aug",
+        "rows": 3800,
+        "units": 487077.0,
+        "wape_model": 0.5499580674146362,
+        "wape_baseline": 0.6246496960439519,
+        "bias_model": -0.24419978706699208,
+        "relative_change": -0.11957362518921366
+      },
+      {
+        "season": "Sep-Nov peak",
+        "rows": 2600,
+        "units": 443668.0,
+        "wape_model": 0.5292950545442401,
+        "wape_baseline": 0.5673341327298791,
+        "bias_model": -0.2473996551002345,
+        "relative_change": -0.06704880949539183
+      }
+    ],
+    "fold": [
+      {
+        "fold": 5,
+        "rows": 800,
+        "units": 108006.0,
+        "wape_model": 0.526449297582633,
+        "wape_baseline": 0.5897450141658797,
+        "bias_model": -0.2719999281966828,
+        "relative_change": -0.10732726019357786
+      },
+      {
+        "fold": 6,
+        "rows": 800,
+        "units": 106174.0,
+        "wape_model": 0.593133157467027,
+        "wape_baseline": 0.6364034509390246,
+        "bias_model": -0.1885485488660734,
+        "relative_change": -0.06799192148966438
+      },
+      {
+        "fold": 7,
+        "rows": 800,
+        "units": 87771.0,
+        "wape_model": 0.5904833171379807,
+        "wape_baseline": 0.7546740950883549,
+        "bias_model": -0.1419877438864848,
+        "relative_change": -0.21756514370769708
+      },
+      {
+        "fold": 8,
+        "rows": 800,
+        "units": 111126.0,
+        "wape_model": 0.5434284254185665,
+        "wape_baseline": 0.5599364685132192,
+        "bias_model": -0.3738496568427024,
+        "relative_change": -0.029481993088405156
+      },
+      {
+        "fold": 9,
+        "rows": 800,
+        "units": 102173.0,
+        "wape_model": 0.494219772593079,
+        "wape_baseline": 0.6107190745108786,
+        "bias_model": -0.22071498472394382,
+        "relative_change": -0.1907575950711925
+      },
+      {
+        "fold": 10,
+        "rows": 800,
+        "units": 135337.0,
+        "wape_model": 0.5409018654901683,
+        "wape_baseline": 0.5296999342382349,
+        "bias_model": -0.22034727175368546,
+        "relative_change": 0.02114769235915226
+      },
+      {
+        "fold": 11,
+        "rows": 800,
+        "units": 122139.0,
+        "wape_model": 0.5486224892211357,
+        "wape_baseline": 0.6539352704705295,
+        "bias_model": -0.11629798207410018,
+        "relative_change": -0.16104465687195235
+      },
+      {
+        "fold": 12,
+        "rows": 800,
+        "units": 158019.0,
+        "wape_model": 0.5059119974717055,
+        "wape_baseline": 0.5206652364589068,
+        "bias_model": -0.3716466923160087,
+        "relative_change": -0.02833536398077874
+      }
+    ]
+  },
+  "interval": {
+    "target": 0.8,
+    "raw_coverage_final": 0.7321875,
+    "calibrated_coverage_final": 0.824375,
+    "calibrated_below_upper_final": 0.893125,
+    "raw_mean_width_over_scale": 3.7226841050536255,
+    "calibrated_mean_width_over_scale": 3.862871773138827,
+    "calibrated_coverage_by_horizon": {
+      "1": 0.834375,
+      "2": 0.834375,
+      "3": 0.823125,
+      "4": 0.805625
+    }
+  },
+  "feature_importance": {
+    "last": 0.031727403320745105,
+    "lag_1": 0.01422175482646786,
+    "lag_2": 0.013541112666041234,
+    "lag_3": 0.01103954584410677,
+    "mean_4": 0.346384051162942,
+    "mean_8": 0.24294161643566786,
+    "mean_13": 0.025802858488094417,
+    "mean_26": 0.025695506100197853,
+    "std_8": 0.015211798935111456,
+    "max_13": 0.012899603778908966,
+    "nonzero_8": 0.004529135242773437,
+    "weeks_since_sale": 0.0010331761062449545,
+    "same_week_last_year": 0.020625404537213482,
+    "trend_4_13": 0.010256409290347218,
+    "price_last": 0.060808699552154157,
+    "price_ratio": 0.011986130674474252,
+    "orders_mean_4": 0.014459601562636955,
+    "total_last": 0.013572954141959805,
+    "total_mean_4": 0.013916082084399909,
+    "total_yoy": 0.007722218348192058,
+    "share_13": 0.05384843636764666,
+    "trading_days_last": 0.0015253473722478717,
+    "age_weeks": 0.011537479580055628,
+    "weekofyear": 0.02022398790482963,
+    "month": 0.0016889602610243503,
+    "weeks_to_xmas": 0.00669949738461888,
+    "trading_days": 0.0061012280308972155
+  }
+}

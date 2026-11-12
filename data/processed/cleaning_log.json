@@ -1,0 +1,26 @@
+{
+  "raw_rows": 1067371,
+  "rows_dropped_sheet_overlap": 22523,
+  "cancellation_rows": 19165,
+  "cancellations_matched_to_a_sale": 6430,
+  "units_removed_as_cancelled_sales": 407272,
+  "rows_dropped_nonpositive_qty_or_price": 6027,
+  "rows_dropped_non_product_codes": 4537,
+  "clean_rows": 1008689,
+  "clean_units": 10814934,
+  "date_min": "2009-12-01",
+  "date_max": "2011-12-09",
+  "skus_total": 4668,
+  "skus_eligible_first_year": 1740,
+  "skus_selected": 200,
+  "selected_share_of_first_year_revenue": 0.4221,
+  "weeks": 104,
+  "week_first": "2009-12-07",
+  "week_last": "2011-11-28",
+  "closed_weeks": [
+    "2009-12-28",
+    "2010-12-27"
+  ],
+  "panel_rows": 20255,
+  "panel_zero_share": 0.0784
+}
