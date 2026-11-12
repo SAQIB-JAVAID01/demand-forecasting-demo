@@ -314,7 +314,11 @@ gift retailer. Public data, fully reproducible. Every number below is generated 
 
 ![Cover](figures/00_cover.png)
 
-## Result in short
+{app_headline()}
+## First model in detail ({m['chosen_model_label']})
+
+The rest of this section and the next ones describe the first model of the project, before the model lab added
+more models and the app switched to the two settings above.
 
 - On the final test folds ({des['final_first_week']} to {des['final_last_week']}, {des['final_rows_scored']:,} product-week
   forecasts) the chosen model has a forecast error (WAPE) of **{pct(model['wape'])}**. The reference simple method,
@@ -512,6 +516,44 @@ def fig_projection(panel: pd.DataFrame, proj: pd.DataFrame, sc: dict):
     plt.close(fig)
 
 
+def app_headline() -> str:
+    """The numbers the app's first screen leads with (src/kpis.py), for every forecast setting."""
+    from . import kpis as K
+    preds = pd.read_parquet(C.PROCESSED_DIR / "predictions.parquet")
+    fin = K.final_rows(preds)
+    sets = K.settings_for(preds)
+    hs = {k: K.headline(fin, k) for k in sets}
+    h0 = next(iter(hs.values()))
+    verdict = {"better": "better", "worse": "below", "level": "level"}
+    pts = lambda x: f"{100 * x:+.1f} pts"
+    rows = "\n".join(
+        f"| {sets[k]}{' (default)' if k == K.DEFAULT_SETTING else ''} | {pct(h['total_acc'])} | "
+        f"{pts(h['total_fva'])} ({verdict[h['total_verdict']]}, 95% range {pts(h['total_ci'][0])} to {pts(h['total_ci'][1])}) | "
+        f"{100 * h['bias']:+.1f}% | {pct(h['product_acc'])} | "
+        f"{pts(h['product_fva'])} ({verdict[h['product_verdict']]}, 95% range {pts(h['product_ci'][0])} to {pts(h['product_ci'][1])}) |"
+        for k, h in hs.items())
+    d = hs[K.DEFAULT_SETTING] if K.DEFAULT_SETTING in hs else h0
+    level = "level with the benchmark" if d["total_verdict"] == "level" else (
+        "better than the benchmark" if d["total_verdict"] == "better" else "below the benchmark")
+    return f"""## Result in short (as shown in the app)
+
+Final test, {fin['week'].min():%d %b %Y} to {fin['week'].max():%d %b %Y}: {d['rows']:,} out-of-sample product-week
+forecasts for {d['products']} products, 1 to 4 weeks ahead. Benchmark: {K.BASE_LABEL}. "Level" means the 95% range
+of the difference includes zero.
+
+| Setting | Weekly-total accuracy | Value added, weekly total | Forecast bias | Product-level accuracy | Value added, per product |
+|---|---|---|---|---|---|
+{rows}
+| {K.BASE_LABEL} (benchmark) | {pct(h0['total_acc_base'])} | - | {100 * h0['bias_base']:+.1f}% | {pct(h0['product_acc_base'])} | - |
+
+The app opens on "{sets.get(K.DEFAULT_SETTING, '')}": its weekly totals are {level}
+({pts(d['total_fva'])}) and its forecast level is {100 * d['bias']:+.1f}% against {100 * d['bias_base']:+.1f}% for the
+benchmark. The other setting is closer product by product and low on totals by design. Accuracy = 1 - WAPE; weekly
+totals add all products up before comparing.
+
+"""
+
+
 def extended_sections() -> str:
     """Model lab, inventory simulation and scenarios, if their outputs exist."""
     out = []
@@ -546,30 +588,40 @@ intermittency (ADI, CV²), trend, Fourier seasonality, UK bank holidays, price a
 product class and UK economic indicators taken at their publication date; leakage tests cover all of them.
 """)
     if ip.exists():
+        from . import kpis as K
         inv = json.loads(ip.read_text())
-        r = next((x for x in inv["runs"] if x["model"] == "ensemble" and x["lead"] == 1 and abs(x["service"] - 0.95) < 1e-9),
-                 inv["runs"][0])
-        m, b, e = r["model_run"], r["base_run"], r["model_same_service"]
-        years = m["weeks"] / 52
-        dv = (b["avg_inventory_value"] - e["avg_inventory_value"]) * 0.45
-        out.append(f"""## Inventory planning: replenishment simulation
+        lead, serv, cost, hold = 1, 0.95, 0.45, 0.25
+        views = {k: K.inventory_view(r, cost, hold) for k in K.SETTINGS
+                 if (r := K.find_run(inv, k, lead, serv)) is not None}
+        if views:
+            first = next(iter(views.values()))
+            b = first["b"]
+            names = [K.SETTINGS[k] for k in views]
+            cell = lambda f: " | ".join(f(v) for v in views.values())
+            rows = [
+                ("Simulated fill rate", cell(lambda v: pct(v["m"]["fill_rate"])), pct(b["fill_rate"])),
+                ("Units short (" + str(b["weeks"]) + " weeks)", cell(lambda v: f"{v['m']['units_short']:,.0f}"),
+                 f"{b['units_short']:,.0f}"),
+                ("Weeks of cover", cell(lambda v: f"{v['m']['weeks_of_cover']:.1f}"), f"{b['weeks_of_cover']:.1f}"),
+                ("Stock needed for the benchmark's fill rate", cell(lambda v: f"{100 * v['inv_change']:+.1f}%"), "-"),
+                ("Carrying-cost saving a year (15-35% holding rate)",
+                 cell(lambda v: f"about GBP {v['saving']:,.0f} (GBP {v['saving_lo']:,.0f} to {v['saving_hi']:,.0f})"), "-"),
+                ("Lost sales avoided a year, same service target", cell(lambda v: f"about GBP {v['lost_rev']:,.0f}"), "-"),
+            ]
+            table = (f"| Same policy | {' | '.join(names)} | 13-week average |\n|---|{'---|' * len(names)}---|\n"
+                     + "\n".join(f"| {r[0]} | {r[1]} | {r[2]} |" for r in rows))
+            out.append(f"""## Inventory planning: replenishment simulation
 
-The same weekly order-up-to policy with lost sales runs once with the forecast ({r['model']}) and once with the
-13-week average, for {inv['products']} products over the {inv['weeks_scored']} final-test weeks. Safety stock =
-z x sigma x sqrt(L + R), sigma from the last 13 weekly misses. Lead time 1 week, review 1 week, 95% target
-(z = {r['z']:.2f}), unit cost 45% of price, holding rate 25% a year; all four are editable in the app.
+The same weekly order-up-to policy with lost sales runs once with each forecast setting and once with the
+13-week average, for {inv['products']} products over the {inv['weeks_scored']} final-test weeks
+({inv['final_start']} to {inv['final_end']}). Safety stock = z x sigma x sqrt(L + R), sigma from the last 13 weekly
+misses. Lead time {lead} week, review 1 week, {pct(serv, 0)} target (z = {first['run']['z']:.2f}), unit cost
+{pct(cost, 0)} of price, holding rate {pct(hold, 0)} a year; all four are editable in the app.
 
-| Same policy | Forecast | 13-week average |
-|---|---|---|
-| Simulated fill rate | {pct(m['fill_rate'])} | {pct(b['fill_rate'])} |
-| Units short | {m['units_short']:,.0f} ({pct(m['share_short'])}) | {b['units_short']:,.0f} ({pct(b['share_short'])}) |
-| Weeks of cover | {m['weeks_of_cover']:.1f} | {b['weeks_of_cover']:.1f} |
+{table}
 
-To match the benchmark's fill rate the forecast needs {pct(abs(e['avg_inventory_value'] / b['avg_inventory_value'] - 1))}
-{'less' if e['avg_inventory_value'] < b['avg_inventory_value'] else 'more'} stock: about GBP {dv * 0.25:,.0f} a year of
-carrying cost (GBP {dv * 0.15:,.0f} to {dv * 0.35:,.0f} at a 15-35% holding rate). Lost sales avoided at the same
-target: about GBP {(b['lost_revenue'] - m['lost_revenue']) / years:,.0f} a year of revenue. Simulation on recorded
-history with stated assumptions, not measured savings.
+"Stock needed" compares average stock when the forecast is tuned to the benchmark's fill rate. Simulation on
+recorded history with stated assumptions, not measured savings.
 """)
     if sp.exists():
         sc = json.loads(sp.read_text())

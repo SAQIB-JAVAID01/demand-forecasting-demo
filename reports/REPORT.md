@@ -5,7 +5,28 @@ gift retailer. Public data, fully reproducible. Every number below is generated 
 
 ![Cover](figures/00_cover.png)
 
-## Result in short
+## Result in short (as shown in the app)
+
+Final test, 25 Apr 2011 to 28 Nov 2011: 6,400 out-of-sample product-week
+forecasts for 200 products, 1 to 4 weeks ahead. Benchmark: 13-week average. "Level" means the 95% range
+of the difference includes zero.
+
+| Setting | Weekly-total accuracy | Value added, weekly total | Forecast bias | Product-level accuracy | Value added, per product |
+|---|---|---|---|---|---|
+| Unbiased totals (default) | 81.4% | +0.7 pts (level, 95% range -4.0 pts to +5.1 pts) | -2.1% | 42.3% | +0.7 pts (level, 95% range -0.8 pts to +2.1 pts) |
+| Best per-product accuracy | 73.4% | -7.4 pts (below, 95% range -11.9 pts to -2.3 pts) | -23.2% | 46.7% | +5.1 pts (better, 95% range +3.7 pts to +6.8 pts) |
+| 13-week average (benchmark) | 80.7% | - | -8.8% | 41.6% | - |
+
+The app opens on "Unbiased totals": its weekly totals are level with the benchmark
+(+0.7 pts) and its forecast level is -2.1% against -8.8% for the
+benchmark. The other setting is closer product by product and low on totals by design. Accuracy = 1 - WAPE; weekly
+totals add all products up before comparing.
+
+
+## First model in detail (Gradient boosting (log target))
+
+The rest of this section and the next ones describe the first model of the project, before the model lab added
+more models and the app switched to the two settings above.
 
 - On the final test folds (2011-04-25 to 2011-11-28, 6,400 product-week
   forecasts) the chosen model has a forecast error (WAPE) of **54.0%**. The reference simple method,
@@ -203,22 +224,23 @@ product class and UK economic indicators taken at their publication date; leakag
 
 ## Inventory planning: replenishment simulation
 
-The same weekly order-up-to policy with lost sales runs once with the forecast (ensemble) and once with the
-13-week average, for 200 products over the 32 final-test weeks. Safety stock =
-z x sigma x sqrt(L + R), sigma from the last 13 weekly misses. Lead time 1 week, review 1 week, 95% target
-(z = 1.64), unit cost 45% of price, holding rate 25% a year; all four are editable in the app.
+The same weekly order-up-to policy with lost sales runs once with each forecast setting and once with the
+13-week average, for 200 products over the 32 final-test weeks
+(2011-04-25 to 2011-11-28). Safety stock = z x sigma x sqrt(L + R), sigma from the last 13 weekly
+misses. Lead time 1 week, review 1 week, 95% target (z = 1.64), unit cost
+45% of price, holding rate 25% a year; all four are editable in the app.
 
-| Same policy | Forecast | 13-week average |
-|---|---|---|
-| Simulated fill rate | 91.0% | 90.2% |
-| Units short | 84,016 (9.0%) | 91,657 (9.8%) |
-| Weeks of cover | 2.2 | 2.3 |
+| Same policy | Unbiased totals | Best per-product accuracy | 13-week average |
+|---|---|---|---|
+| Simulated fill rate | 91.5% | 91.0% | 90.2% |
+| Units short (32 weeks) | 79,422 | 84,016 | 91,657 |
+| Weeks of cover | 2.5 | 2.2 | 2.3 |
+| Stock needed for the benchmark's fill rate | -2.4% | -11.3% | - |
+| Carrying-cost saving a year (15-35% holding rate) | about GBP 493 (GBP 296 to 690) | about GBP 2,333 (GBP 1,400 to 3,266) | - |
+| Lost sales avoided a year, same service target | about GBP 59,000 | about GBP 29,587 | - |
 
-To match the benchmark's fill rate the forecast needs 11.3%
-less stock: about GBP 2,333 a year of
-carrying cost (GBP 1,400 to 3,266 at a 15-35% holding rate). Lost sales avoided at the same
-target: about GBP 29,587 a year of revenue. Simulation on recorded
-history with stated assumptions, not measured savings.
+"Stock needed" compares average stock when the forecast is tuned to the benchmark's fill rate. Simulation on
+recorded history with stated assumptions, not measured savings.
 
 ## Sales projection under economic scenarios
 

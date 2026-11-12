@@ -67,8 +67,23 @@ VERDICT = {"better": "better than the benchmark", "worse": "below the benchmark"
 def style(chart: alt.Chart, height: int = 320) -> alt.Chart:
     return (chart.properties(height=height)
             .configure_view(strokeWidth=0)
-            .configure_axis(gridColor=GRID, domainColor=GRID, tickColor=GRID, labelColor="#a3abb7", titleColor="#a3abb7")
-            .configure_legend(labelColor="#a3abb7", titleColor="#a3abb7", orient="top"))
+            .configure_axis(gridColor=GRID, domainColor=GRID, tickColor=GRID, labelColor="#a3abb7", titleColor="#a3abb7",
+                            labelFontSize=12, titleFontSize=12, titleFontWeight="normal")
+            .configure_legend(labelColor="#c3cad4", titleColor="#a3abb7", orient="top", labelFontSize=12,
+                              symbolStrokeWidth=3))
+
+
+def table(df: pd.DataFrame, **cfg):
+    """A read-only table sized to show every row (no inner scroll bar)."""
+    st.dataframe(df, hide_index=True, use_container_width=True, height=36 * (len(df) + 1) + 3,
+                 column_config={k: st.column_config.TextColumn(k, width=w) for k, w in cfg.items()} or None)
+
+
+def metric(col, label: str, value: str, note: str, tone: str = "neutral", help: str | None = None):
+    """A headline tile. tone: good (green), bad (red) or neutral (grey). No arrow: the note is a label, not a change."""
+    neg = note.lstrip()[:1] in ("-", "−")    # Streamlit colours a note by its sign: "normal" = positive green
+    color = "off" if tone == "neutral" else ("inverse" if (tone == "good") == neg else "normal")
+    col.metric(label, value, note, delta_color=color, delta_arrow="off", help=help)
 
 
 def line_chart(df: pd.DataFrame, colors: dict, y_title: str = "Units", height: int = 320) -> alt.Chart:
@@ -125,20 +140,28 @@ if page == "Executive summary":
                f"Units, weekly, 1–4 weeks ahead, {H['products']} products, {H['rows']:,} out-of-sample forecasts, {span}.")
 
     c = st.columns(4)
-    c[0].metric("Weekly-total accuracy", pct(H["total_acc"]), f"benchmark {pct(H['total_acc_base'])}", delta_color="off",
-                help="1 − Σ|forecast total − actual total| / Σ actual total, week by week. The order-quantity view.")
-    c[1].metric("Value added vs benchmark", pts(H["total_fva"]), VERDICT[H["total_verdict"]],
-                delta_color="off" if H["total_verdict"] == "level" else ("normal" if H["total_fva"] > 0 else "inverse"),
-                help=f"Weekly-total accuracy points over the {K.BASE_LABEL}. 95% range {pts(H['total_ci'][0])} to "
-                     f"{pts(H['total_ci'][1])} (resampling weeks). Level = the range includes zero.")
-    c[2].metric("Forecast bias", spct(H["bias"]), K.bias_tag(H["bias"]), delta_color="normal" if b_ok else "off",
-                help=f"Σ(forecast − actual) / Σ actual, target ±5%. Benchmark {spct(H['bias_base'])}.")
-    c[3].metric("Product-level accuracy", pct(H["product_acc"]),
-                f"{pts(H['product_fva'])} vs benchmark ({H['product_verdict']})",
-                delta_color="off" if H["product_verdict"] == "level" else "normal",
-                help=f"1 − WAPE per product-week, volume-weighted. 95% range of the gain {pts(H['product_ci'][0])} to "
+    tone = {"better": "good", "worse": "bad", "level": "neutral"}
+    metric(c[0], "Weekly-total accuracy", pct(H["total_acc"]), f"benchmark {pct(H['total_acc_base'])}",
+           help="1 − Σ|forecast total − actual total| / Σ actual total, week by week. The order-quantity view.")
+    metric(c[1], "Value added vs benchmark", pts(H["total_fva"]),
+           VERDICT[H["total_verdict"]],
+           tone[H["total_verdict"]],
+           help=f"Weekly-total accuracy points over the {K.BASE_LABEL}. 95% range {pts(H['total_ci'][0])} to "
+                f"{pts(H['total_ci'][1])} (resampling weeks). Level = the range includes zero.")
+    metric(c[2], "Forecast bias", spct(H["bias"]), K.bias_tag(H["bias"]),
+           "good" if b_ok else "neutral",
+           help=f"Σ(forecast − actual) / Σ actual, target ±5%. Benchmark {spct(H['bias_base'])}.")
+    metric(c[3], "Product-level accuracy", pct(H["product_acc"]),
+           f"{pts(H['product_fva'])}, level" if H["product_verdict"] == "level" else f"{pts(H['product_fva'])} vs benchmark",
+           tone[H["product_verdict"]],
+           help=f"1 − WAPE per product-week, volume-weighted. 95% range of the gain {pts(H['product_ci'][0])} to "
                      f"{pts(H['product_ci'][1])} (resampling products). Single gift products sell in small, irregular "
                      f"amounts, so product-week error is high for every method.")
+
+    st.caption(f"95% ranges of the value added, {K.BASE_LABEL} as benchmark: weekly total {pts(H['total_ci'][0])} to "
+               f"{pts(H['total_ci'][1])} ({VERDICT[H['total_verdict']]}); per product {pts(H['product_ci'][0])} to "
+               f"{pts(H['product_ci'][1])} ({VERDICT[H['product_verdict']]}). Benchmark bias {spct(H['bias_base'])}. "
+               "Level means the range includes zero.")
 
     st.markdown("#### Two forecast settings, one trade-off")
     rows = [{"Setting": SETTINGS[k] + (" (shown now)" if k == setting else ""),
@@ -149,7 +172,7 @@ if page == "Executive summary":
     rows.append({"Setting": f"{K.BASE_LABEL} (benchmark)", "Weekly-total accuracy": pct(H["total_acc_base"]),
                  "Forecast bias": spct(H["bias_base"]), "Product-level accuracy": pct(H["product_acc_base"]),
                  "Per product vs benchmark": "–", "Use for": "Comparison"})
-    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    st.table(pd.DataFrame(rows).set_index("Setting"))
     st.caption("No setting wins both. " + " ".join(f"**{SETTINGS[k]}.** {K.SETTING_WHY[k]}" for k in SETTINGS
                                                    if k in K.SETTING_WHY))
 
@@ -182,22 +205,21 @@ elif page == "Forecast accuracy":
         x=alt.X("Value added (pts):Q", title=f"Accuracy points vs {K.BASE_LABEL} (product-week)"),
         color=alt.condition(alt.datum["Value added (pts)"] >= 0, alt.value(GREEN), alt.value("#f2555a")),
         tooltip=["Segment", alt.Tooltip("Value added (pts):Q", format="+.1f")])
-    st.altair_chart(style(bars, 360), use_container_width=True)
+    st.altair_chart(style(bars, 34 * len(sg) + 40), use_container_width=True)
     show = sg.assign(**{"Forecast": sg["Forecast"].map(pct), K.BASE_LABEL: sg[K.BASE_LABEL].map(pct),
                         "Value added (pts)": sg["Value added (pts)"].map("{:+.1f}".format), "Bias": sg["Bias"].map(spct)})
-    st.dataframe(show, hide_index=True, use_container_width=True)
+    table(show)
 
     lab = D["lab"]
     if lab:
         st.markdown("#### Model lab: every model on the same rolling backtest")
         lb = pd.DataFrame(lab["leaderboard"]).sort_values("wape")
-        st.dataframe(pd.DataFrame({
+        table(pd.DataFrame({
             "Model": lb["label"], "Family": lb["family"],
             "Weekly-total accuracy": (1 - lb["total_wape"]).map(pct), "Bias": lb["bias"].map(spct),
             "Product-level accuracy": (1 - lb["wape"]).map(pct),
-            "Error vs 13-week average (95% range)": [
-                f"{100 * v:+.1f}% ({100 * ci[0]:+.0f} to {100 * ci[1]:+.0f})" for v, ci in zip(lb["vs_ma13"], lb["vs_ma13_ci95"])]}),
-            hide_index=True, use_container_width=True)
+            "Error vs 13-wk avg (95% range)": [
+                f"{100 * v:+.1f}% ({100 * ci[0]:+.0f} to {100 * ci[1]:+.0f})" for v, ci in zip(lb["vs_ma13"], lb["vs_ma13_ci95"])]}))
         names = {r["model"]: r["label"] for r in lab["leaderboard"]}
         st.caption(f"All product-weeks of the final test ({lab['final_rows']:,}), no filters. The first 5 forecast dates "
                    f"chose the ensemble members ({', '.join(names.get(m, m) for m in lab['ensemble_members'])}); "
@@ -230,13 +252,15 @@ elif page == "Inventory simulation":
                  f"with the {K.BASE_LABEL}, and needs {abs(100 * ic):.0f}% {'less' if ic < 0 else 'more'} stock for the "
                  f"same fill rate.")
     k = st.columns(5)
-    k[0].metric("Simulated fill rate", pct(m["fill_rate"]), f"{100 * (m['fill_rate'] - b['fill_rate']):+.1f} pts vs benchmark")
-    k[1].metric("Units short", f"{m['units_short']:,.0f}", f"{m['units_short'] - b['units_short']:+,.0f} vs benchmark",
-                delta_color="inverse")
-    k[2].metric("Stock for the same fill rate", f"{100 * ic:+.1f}%", "vs benchmark", delta_color="off")
-    k[3].metric("Carrying-cost saving", f"£{r['saving']:,.0f}/yr", f"£{r['saving_lo']:,.0f} to £{r['saving_hi']:,.0f} at 15–35%",
-                delta_color="off")
-    k[4].metric("Lost sales avoided", f"£{r['lost_rev']:,.0f}/yr", f"£{r['lost_margin']:,.0f} margin", delta_color="off")
+    dfill, dshort = m["fill_rate"] - b["fill_rate"], m["units_short"] - b["units_short"]
+    metric(k[0], "Simulated fill rate", pct(m["fill_rate"]), f"{100 * dfill:+.1f} pts vs benchmark",
+           "good" if dfill > 0 else ("bad" if dfill < 0 else "neutral"))
+    metric(k[1], "Units short", f"{m['units_short']:,.0f}", f"{dshort:+,.0f} vs benchmark",
+           "good" if dshort < 0 else ("bad" if dshort > 0 else "neutral"))
+    metric(k[2], "Stock for the same fill rate", f"{100 * ic:+.1f}%", f"vs benchmark at {pct(b['fill_rate'])} fill",
+           "good" if ic < 0 else "neutral")
+    metric(k[3], "Carrying-cost saving", f"£{r['saving']:,.0f}/yr", f"£{r['saving_lo']:,.0f} to £{r['saving_hi']:,.0f} at 15–35%")
+    metric(k[4], "Lost sales avoided", f"£{r['lost_rev']:,.0f}/yr", f"£{r['lost_margin']:,.0f} margin")
     st.caption(f"{inv['products']} products over the {inv['weeks_scored']} final-test weeks ({inv['final_start']} to "
                f"{inv['final_end']}). Safety stock = z × σ × √(L + R): z = {run['z']:.2f} for {pct(serv, 0)}, "
                f"L = {lead} wk lead time, R = 1 wk review, σ = spread of the last 13 weekly misses. Weeks of cover "
@@ -248,7 +272,7 @@ elif page == "Inventory simulation":
         "Carrying-cost saving / yr": f"£{v['saving']:,.0f}", "Lost sales avoided / yr": f"£{v['lost_rev']:,.0f}"}}
         for k_ in SETTINGS if (rr := K.find_run(inv, k_, lead, serv)) for v in [K.inventory_view(rr, cost, hold)]])
     st.markdown("#### Both settings under these inputs")
-    st.dataframe(comp, hide_index=True, use_container_width=True)
+    table(comp)
 
 elif page == "Sales projection":
     st.title("Sales projection under economic scenarios")
@@ -276,12 +300,14 @@ elif page == "Sales projection":
     tot = {n: float(v["mean"].sum()) for n, v in named.items()}
     s_tot = float(sel["mean"].sum())
     k = st.columns(3)
-    k[0].metric("Base projection, next 26 weeks", f"{tot['Base']:,.0f} units",
-                f"80% interval {proj['lo80'].sum():,.0f} to {proj['hi80'].sum():,.0f}", delta_color="off")
-    k[1].metric(f"{name} scenario", f"{s_tot:,.0f} units", f"{100 * (s_tot / tot['Base'] - 1):+.1f}% vs base",
-                delta_color="off" if name == "Base" else "normal")
-    k[2].metric("Recession to boom", f"{100 * (tot['Recession'] / tot['Base'] - 1):+.0f}% to "
-                                     f"{100 * (tot['Boom'] / tot['Base'] - 1):+.0f}%", "vs base, 26-week total", delta_color="off")
+    chg = s_tot / tot["Base"] - 1
+    metric(k[0], "Base projection, next 26 weeks", f"{tot['Base']:,.0f} units",
+           f"80% interval {proj['lo80'].sum():,.0f} to {proj['hi80'].sum():,.0f}")
+    metric(k[1], f"Selected scenario: {name}", f"{s_tot:,.0f} units",
+           "same as base" if abs(chg) < 5e-4 else f"{100 * chg:+.1f}% vs base",
+           "neutral" if abs(chg) < 5e-4 else ("good" if chg > 0 else "bad"))
+    metric(k[2], "Recession to boom", f"{100 * (tot['Recession'] / tot['Base'] - 1):+.0f}% to "
+                                      f"{100 * (tot['Boom'] / tot['Base'] - 1):+.0f}%", "vs base, 26-week total")
     hist = panel.groupby("week")["units"].sum().sort_index().iloc[-52:].rename("value").reset_index()
     base_x = alt.X("week:T", title=None)
     band95 = alt.Chart(sel).mark_area(opacity=0.18, color=BLUE).encode(x=base_x, y=alt.Y("lo95:Q", title="Units per week"), y2="hi95:Q")
@@ -300,11 +326,11 @@ elif page == "Sales projection":
                "Dashed: recession (orange), base (grey), boom (green).")
     me = info["macro_estimates"]
     st.markdown("#### Assumptions, visible")
-    st.dataframe(pd.DataFrame([{
+    table(pd.DataFrame([{
         "Indicator": label_, "Change in this scenario": f"{deltas[key]:+.1f}",
         "Assumed effect per unit": f"{100 * sens[key]:+.1f}%",
         "Estimated from 2009–2011 (95% range)": f"{100 * me[key]['effect']:+.0f}% ({100 * me[key]['lo95']:+.0f} to {100 * me[key]['hi95']:+.0f})"}
-        for key, label_, *_ in INDICATORS]), hide_index=True, use_container_width=True)
+        for key, label_, *_ in INDICATORS]))
     st.caption(f"With two years of data the estimated effects are wide and mixed up with the trend, so the projection uses "
                f"the stated assumptions. Price elasticity {el:.2f} (95% {info['price']['lo95']:.2f} to "
                f"{info['price']['hi95']:.2f}), estimated from the retailer's own price changes.")
